@@ -45,7 +45,7 @@ public class ProfileFragment extends Fragment {
         User user = repo.getCurrentUser();
         
         // Continue Watching
-        java.util.List<Movie> continueWatchingList = repo.getContinueWatchingMovies();
+        java.util.Set<Movie> continueWatchingList = repo.getContinueWatchingMovies();
         if (!continueWatchingList.isEmpty()) {
             labelContinueWatching.setVisibility(View.VISIBLE);
             continueWatchingRecyclerView.setVisibility(View.VISIBLE);

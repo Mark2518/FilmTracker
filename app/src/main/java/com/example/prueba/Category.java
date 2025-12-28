@@ -1,16 +1,24 @@
 package com.example.prueba;
 
-import java.util.List;
+import java.util.Set;
 
 public class Category {
     private String title;
-    private List<Movie> movies;
+    private Set<Movie> movies;
 
-    public Category(String title, List<Movie> movies) {
+    private Runnable onRefresh;
+
+    public Category(String title, Set<Movie> movies) {
+        this(title, movies, null);
+    }
+
+    public Category(String title, Set<Movie> movies, Runnable onRefresh) {
         this.title = title;
         this.movies = movies;
+        this.onRefresh = onRefresh;
     }
 
     public String getTitle() { return title; }
-    public List<Movie> getMovies() { return movies; }
+    public Set<Movie> getMovies() { return movies; }
+    public Runnable getOnRefresh() { return onRefresh; }
 }

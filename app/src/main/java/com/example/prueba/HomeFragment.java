@@ -129,30 +129,85 @@ public class HomeFragment extends Fragment {
         categoryList.clear();
         DataRepository repo = DataRepository.getInstance();
         
-        // Only add categories if they have items
-        List<Movie> continueWatching = repo.getContinueWatchingMovies();
+        // Continue Watching (No refresh needed usually, but could add if desired)
+        //Hola
+        // Continue Watching (No refresh needed usually, but could add if desired)
+        //Hola
+        java.util.Set<Movie> continueWatching = repo.getContinueWatchingMovies();
         if (!continueWatching.isEmpty()) categoryList.add(new Category("Continue Watching", continueWatching));
 
-        List<Movie> recommendations = repo.getRecommendedMovies();
-        if (!recommendations.isEmpty()) categoryList.add(new Category("Recomendaciones", recommendations));
+        // Recommendations
+        java.util.Set<Movie> recommendations = repo.getRecommendedMovies();
+        // Always show recommendations section even if empty initially to allow refresh? 
+        // Or wait for data? The requirement says "initially 20 random". 
+        // repo.loadRecommendations handles the initial fetch if empty.
+        if (!recommendations.isEmpty()) {
+            categoryList.add(new Category("Recomendaciones", recommendations, () -> {
+                android.widget.Toast.makeText(getContext(), "Refresing recommendations...", android.widget.Toast.LENGTH_SHORT).show();
+                repo.refreshRecommendations(new DataRepository.DataCallback() {
+                    @Override
+                    public void onDataLoaded() {
+                         if (getActivity() != null) updateUI();
+                    }
+                    @Override
+                    public void onError(String error) {
+                        if (getActivity() != null) android.widget.Toast.makeText(getContext(), "Error: " + error, android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }));
+        }
 
-        List<Movie> movies = repo.getMovies();
-        if (!movies.isEmpty()) categoryList.add(new Category("Movies", movies));
+        // Dynamic Genre Sections
+        List<String> significantGenres = repo.getSignificantGenres();
+        for (String genre : significantGenres) {
+            java.util.Set<Movie> genreMovies = repo.getMoviesForGenre(genre);
+            if (!genreMovies.isEmpty()) {
+                // Capitalize first letter
+                String title = genre.substring(0, 1).toUpperCase() + genre.substring(1);
+                
+                categoryList.add(new Category(title, genreMovies, () -> {
+                   // Refresh this specific genre section
+                   // Since getMoviesForGenre shuffles, we just need to rebuild the category list and notify adapter
+                   // But we can't just call updateUI() because that would refresh EVERYTHING / re-shuffle everything?
+                   // No, getMoviesForGenre shuffles every time it is called.
+                   // If we call updateUI(), all genres will re-shuffle.
+                   // To avoid that, we might strictly need to update just this index, but for simplicity/mvp,
+                   // refreshing one section causing a general UI update is acceptable, 
+                   // OR we can make the "refresh" button just re-fetch this one list and notify adapter.
+                   // For now, let's just trigger a full updateUI for simplicity as it's fast on local cache.
+                   // Actually, if we want to keep others stable, we should implement a specific update.
+                   
+                   // Re-fetching just this genre
+                   if (getActivity() != null) {
+                       java.util.Set<Movie> newMovies = repo.getMoviesForGenre(genre);
+                       // Find the category in the list and update it
+                       for (int i = 0; i < categoryList.size(); i++) {
+                           if (categoryList.get(i).getTitle().equalsIgnoreCase(title)) {
+                               // We need to update the movies in the category object.
+                               // Category object is immutable regarding movie list reference usually, check Category.java
+                               // Category.java has final list? No, just generated in constructor.
+                               // Let's replace the category object in the list.
+                               categoryList.set(i, new Category(title, newMovies, categoryList.get(i).getOnRefresh()));
+                               adapter.notifyItemChanged(i);
+                               break;
+                           }
+                       }
+                   }
+                }));
+            }
+        }
         
-        List<Movie> series = repo.getSeries();
-        if (!series.isEmpty()) categoryList.add(new Category("Series", series));
+        // Fallback or "All Movies" if nothing else? 
+        // Requirement says "sections of significant genres".
         
-        List<Movie> action = repo.getActionMovies();
-        if (!action.isEmpty()) categoryList.add(new Category("Action & Adventure", action));
-        
-        List<Movie> scifi = repo.getSciFiMovies();
-        if (!scifi.isEmpty()) categoryList.add(new Category("Sci-Fi & Future", scifi));
-        
-        List<Movie> crime = repo.getCrimeMovies();
-        if (!crime.isEmpty()) categoryList.add(new Category("Crime & Drama", crime));
-        
-        List<Movie> all = repo.getAllMovies();
-        if (!all.isEmpty()) categoryList.add(new Category("All Content", all));
+        if (categoryList.isEmpty()) {
+             java.util.Set<Movie> all = repo.getAllMovies();
+             if (!all.isEmpty()) {
+                 List<Movie> allList = new ArrayList<>(all);
+                 List<Movie> subList = allList.subList(0, Math.min(allList.size(), 20));
+                 categoryList.add(new Category("All Content", new java.util.LinkedHashSet<>(subList)));
+             }
+        }
 
         adapter.notifyDataSetChanged();
     }

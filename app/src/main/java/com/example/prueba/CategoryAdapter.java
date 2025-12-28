@@ -27,21 +27,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
         return new CategoryViewHolder(view);
     }
 
-    @Override
-    public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
-        Category category = categoryList.get(position);
-        holder.title.setText(category.getTitle());
-
-        HorizontalMovieAdapter movieAdapter = new HorizontalMovieAdapter(context, category.getMovies());
-        holder.recyclerView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
-        holder.recyclerView.setAdapter(movieAdapter);
-    }
-
-    @Override
-    public int getItemCount() {
-        return categoryList.size();
-    }
-
     public static class CategoryViewHolder extends RecyclerView.ViewHolder {
         TextView title;
         RecyclerView recyclerView;
@@ -51,5 +36,21 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             title = itemView.findViewById(R.id.category_title);
             recyclerView = itemView.findViewById(R.id.category_recycler_view);
         }
+    }
+
+    @Override
+    public int getItemCount() {
+        return categoryList.size();
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
+        Category category = categoryList.get(position);
+        holder.title.setText(category.getTitle());
+
+        // Refresh is now handled by the horizontal adapter's footer item
+        HorizontalMovieAdapter movieAdapter = new HorizontalMovieAdapter(context, category.getMovies(), category.getOnRefresh());
+        holder.recyclerView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
+        holder.recyclerView.setAdapter(movieAdapter);
     }
 }

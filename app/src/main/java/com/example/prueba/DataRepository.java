@@ -1,12 +1,14 @@
 package com.example.prueba;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public class DataRepository {
     private static DataRepository instance;
     private User currentUser;
-    private List<Movie> cachedMovies;
+    private Set<Movie> cachedMovies;
     private TursoClient tursoClient;
 
     public void cacheMovie(Movie movie) {
@@ -17,7 +19,7 @@ public class DataRepository {
 
     private DataRepository() {
         currentUser = new User("Guest User");
-        cachedMovies = new ArrayList<>();
+        cachedMovies = new LinkedHashSet<>();
         tursoClient = new TursoClient();
     }
 
@@ -38,7 +40,7 @@ public class DataRepository {
     }
 
     private int currentOffset = 0;
-    private static final int PAGE_SIZE = 50;
+    private static final int PAGE_SIZE = 10;
     private boolean isLoading = false;
 
     public void refreshMovies(DataCallback callback) {
@@ -48,7 +50,7 @@ public class DataRepository {
         
         tursoClient.fetchMovies(PAGE_SIZE, currentOffset, new TursoClient.MovieCallback() {
             @Override
-            public void onSuccess(List<Movie> movies) {
+            public void onSuccess(Set<Movie> movies) {
                 cachedMovies.clear();
                 cachedMovies.addAll(movies);
                 
@@ -82,7 +84,7 @@ public class DataRepository {
 
         tursoClient.fetchMovies(PAGE_SIZE, currentOffset, new TursoClient.MovieCallback() {
             @Override
-            public void onSuccess(List<Movie> movies) {
+            public void onSuccess(Set<Movie> movies) {
                 if (!movies.isEmpty()) {
                     for (Movie m : movies) {
                         if (!cachedMovies.contains(m)) {
@@ -107,28 +109,28 @@ public class DataRepository {
         return currentUser;
     }
 
-    public List<Movie> getAllMovies() {
-        return new ArrayList<>(cachedMovies);
+    public Set<Movie> getAllMovies() {
+        return new LinkedHashSet<>(cachedMovies);
     }
 
-    public List<Movie> getMovies() {
-        List<Movie> movies = new ArrayList<>();
+    public Set<Movie> getMovies() {
+        Set<Movie> movies = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (!m.isSeries()) movies.add(m);
         }
         return movies;
     }
 
-    public List<Movie> getSeries() {
-        List<Movie> series = new ArrayList<>();
+    public Set<Movie> getSeries() {
+        Set<Movie> series = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (m.isSeries()) series.add(m);
         }
         return series;
     }
 
-    public List<Movie> getActionMovies() {
-        List<Movie> action = new ArrayList<>();
+    public Set<Movie> getActionMovies() {
+        Set<Movie> action = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (hasGenre(m, "action") || hasGenre(m, "adventure") || hasGenre(m, "aventura") || hasGenre(m, "accion") || hasGenre(m, "acción")) {
                 action.add(m);
@@ -137,8 +139,8 @@ public class DataRepository {
         return action;
     }
 
-    public List<Movie> getSciFiMovies() {
-        List<Movie> scifi = new ArrayList<>();
+    public Set<Movie> getSciFiMovies() {
+        Set<Movie> scifi = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (hasGenre(m, "sci") || hasGenre(m, "future") || hasGenre(m, "ciencia") || hasGenre(m, "space")) {
                 scifi.add(m);
@@ -147,8 +149,8 @@ public class DataRepository {
         return scifi;
     }
 
-    public List<Movie> getCrimeMovies() {
-        List<Movie> crime = new ArrayList<>();
+    public Set<Movie> getCrimeMovies() {
+        Set<Movie> crime = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (hasGenre(m, "crime") || hasGenre(m, "drama") || hasGenre(m, "policial") || hasGenre(m, "thriller")) {
                 crime.add(m);
@@ -157,9 +159,9 @@ public class DataRepository {
         return crime;
     }
 
-    public List<Movie> search(String query) {
+    public Set<Movie> search(String query) {
         // Local filter as fallback or for instant results
-        List<Movie> results = new ArrayList<>();
+        Set<Movie> results = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (m.getTitle().toLowerCase().contains(query.toLowerCase())) {
                 results.add(m);
@@ -169,14 +171,14 @@ public class DataRepository {
     }
 
     public interface SearchCallback {
-        void onResults(List<Movie> movies);
+        void onResults(Set<Movie> movies);
         void onError(String error);
     }
 
     public void searchMovies(String query, int limit, int offset, SearchCallback callback) {
         tursoClient.searchMovies(query, limit, offset, new TursoClient.MovieCallback() {
             @Override
-            public void onSuccess(List<Movie> movies) {
+            public void onSuccess(Set<Movie> movies) {
                 if (callback != null) callback.onResults(movies);
             }
 
@@ -187,8 +189,8 @@ public class DataRepository {
         });
     }
 
-    public List<Movie> getContinueWatchingMovies() {
-        List<Movie> inProgress = new ArrayList<>();
+    public Set<Movie> getContinueWatchingMovies() {
+        Set<Movie> inProgress = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
             if (currentUser.getResumePosition(m) > 0) {
                 inProgress.add(m);
@@ -197,73 +199,107 @@ public class DataRepository {
         return inProgress;
     }
 
-    private List<Movie> recommendedMovies = new ArrayList<>();
+    private Set<Movie> recommendedMovies = new LinkedHashSet<>();
 
-    public List<Movie> getRecommendedMovies() {
-        return new ArrayList<>(recommendedMovies);
+    public Set<Movie> getRecommendedMovies() {
+        return new LinkedHashSet<>(recommendedMovies);
     }
 
-    public void loadRecommendations(DataCallback callback) {
-        if (currentUser.getSeenList().isEmpty() && currentUser.getWatchlist().isEmpty() && currentUser.getResumeMovies().isEmpty()) {
-            fetchRandomRecs(callback);
-        } else {
-            java.util.Map<String, Integer> genreCounts = new java.util.HashMap<>();
-            addGenresToCount(currentUser.getSeenList(), genreCounts);
-            addGenresToCount(currentUser.getWatchlist(), genreCounts);
-            addGenresToCount(currentUser.getResumeMovies(), genreCounts);
+    private boolean recommendationsDirty = true;
 
-            List<String> sortedGenres = new ArrayList<>(genreCounts.keySet());
-            sortedGenres.sort((a, b) -> genreCounts.get(b) - genreCounts.get(a));
-            
-            java.util.Map<String, Integer> titleCounts = new java.util.HashMap<>();
-            addTitlesToCount(currentUser.getSeenList(), titleCounts);
-            addTitlesToCount(currentUser.getWatchlist(), titleCounts);
-            addTitlesToCount(currentUser.getResumeMovies(), titleCounts);
-            
-            List<String> sortedKeywords = new ArrayList<>(titleCounts.keySet());
-            sortedKeywords.sort((a, b) -> titleCounts.get(b) - titleCounts.get(a));
-
-            if (sortedGenres.isEmpty() && sortedKeywords.isEmpty()) {
-                fetchRandomRecs(callback);
-                return;
-            }
-
-            tursoClient.fetchRecommendations(sortedGenres, sortedKeywords, new TursoClient.MovieCallback() {
-                @Override
-                public void onSuccess(List<Movie> movies) {
-                    if (movies.isEmpty()) {
-                        fetchRandomRecs(callback);
-                    } else {
-                        recommendedMovies.clear();
-                        recommendedMovies.addAll(movies);
-                        if (callback != null) callback.onDataLoaded();
-                    }
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    fetchRandomRecs(callback);
-                }
-            });
+    public void addToWatchlist(Movie movie) {
+        if (!currentUser.isInWatchlist(movie)) {
+            currentUser.addToWatchlist(movie);
+            recommendationsDirty = true;
         }
     }
 
-    private void fetchRandomRecs(DataCallback callback) {
-        tursoClient.fetchRandomMovies(new TursoClient.MovieCallback() {
-            @Override
-            public void onSuccess(List<Movie> movies) {
-                recommendedMovies.clear();
-                recommendedMovies.addAll(movies);
-                if (callback != null) callback.onDataLoaded();
-            }
-            @Override
-            public void onError(Exception e) {
-                if (callback != null) callback.onError(e.getMessage());
-            }
-        });
+    public void addToSeen(Movie movie) {
+        if (!currentUser.isSeen(movie)) {
+            currentUser.addToSeen(movie);
+            recommendationsDirty = true;
+        }
     }
 
-    private void addGenresToCount(List<Movie> movies, java.util.Map<String, Integer> counts) {
+    public void removeFromWatchlist(Movie movie) {
+        if (currentUser.isInWatchlist(movie)) {
+            currentUser.removeFromWatchlist(movie);
+            recommendationsDirty = true;
+        }
+    }
+
+    public void removeFromSeen(Movie movie) {
+        if (currentUser.isSeen(movie)) {
+            currentUser.removeFromSeen(movie);
+            recommendationsDirty = true;
+        }
+    }
+
+    public void refreshRecommendations(DataCallback callback) {
+        // Force refresh
+        recommendationsDirty = true;
+        loadRecommendations(callback);
+    }
+
+    public void loadRecommendations(DataCallback callback) {
+        if (!recommendationsDirty && !recommendedMovies.isEmpty()) {
+            if (callback != null) callback.onDataLoaded();
+            return;
+        }
+
+        // Logic relies on local cache for "optimization" as per request to avoid API spam if possible,
+        // but since we want "20 random movies" initially or "based on genres", we can synthesize this.
+        // Actually, the request says "random 20 initially" or "same genres as seen/watchlist".
+
+        Set<Movie> candidates = new LinkedHashSet<>();
+        
+        Set<String> targetGenres = new LinkedHashSet<>();
+        java.util.Map<String, Integer> genreCounts = new java.util.HashMap<>();
+        addGenresToCount(currentUser.getSeenList(), genreCounts);
+        addGenresToCount(currentUser.getWatchlist(), genreCounts);
+
+        if (genreCounts.isEmpty()) {
+            // Random 20 from cached movies (assuming cachedMovies has enough diversity or is the full DB)
+            // If cachedMovies is small, this might just return what we have.
+            candidates.addAll(cachedMovies);
+        } else {
+            // Filter by genre
+            for (String genre : genreCounts.keySet()) {
+                targetGenres.add(genre.toLowerCase());
+            }
+
+            for (Movie m : cachedMovies) {
+                // Don't recommend what is already seen or in watchlist
+                if (currentUser.isSeen(m) || currentUser.isInWatchlist(m)) continue;
+                
+                if (hasAnyGenre(m, targetGenres)) {
+                    if (!candidates.contains(m)) candidates.add(m);
+                }
+            }
+        }
+
+        // If candidates are still empty (e.g. strict filtering), fallback to all cached
+        if (candidates.isEmpty()) {
+            for (Movie m : cachedMovies) {
+                if (!currentUser.isSeen(m) && !currentUser.isInWatchlist(m)) {
+                    candidates.add(m);
+                }
+            }
+        }
+
+        // Pick 20 random
+        List<Movie> candidateList = new ArrayList<>(candidates);
+        java.util.Collections.shuffle(candidateList);
+        recommendedMovies.clear();
+        for (int i = 0; i < Math.min(candidateList.size(), 20); i++) {
+            recommendedMovies.add(candidateList.get(i));
+        }
+        
+        recommendationsDirty = false;
+        if (callback != null) callback.onDataLoaded();
+    }
+    
+    private void addGenresToCount(java.util.Collection<Movie> movies, java.util.Map<String, Integer> counts) {
         for (Movie m : movies) {
             if (m.getGenres() != null && !m.getGenres().isEmpty()) {
                 for (String g : m.getGenres()) {
@@ -275,7 +311,7 @@ public class DataRepository {
         }
     }
 
-    private void addTitlesToCount(List<Movie> movies, java.util.Map<String, Integer> counts) {
+    private void addTitlesToCount(java.util.Collection<Movie> movies, java.util.Map<String, Integer> counts) {
         for (Movie m : movies) {
             if (m.getTitle() != null) {
                 String[] words = m.getTitle().split("\\s+");
@@ -288,6 +324,45 @@ public class DataRepository {
             }
         }
     }
+
+    private boolean hasAnyGenre(Movie m, java.util.Collection<String> targetGenres) {
+        if (m.getGenres() == null) return false;
+        for (String g : m.getGenres()) {
+            if (targetGenres.contains(g.toLowerCase())) return true;
+        }
+        return false;
+    }
+
+    // Genre Sections Logic
+    public List<String> getSignificantGenres() {
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        addGenresToCount(cachedMovies, counts);
+        
+        List<String> sorted = new ArrayList<>(counts.keySet());
+        sorted.sort((a, b) -> counts.get(b) - counts.get(a));
+        
+        // Return top 5 or so
+        if (sorted.size() > 5) return sorted.subList(0, 5);
+        return sorted;
+    }
+
+    public Set<Movie> getMoviesForGenre(String genre) {
+        List<Movie> matches = new ArrayList<>();
+        for (Movie m : cachedMovies) {
+            if (hasGenre(m, genre)) {
+                matches.add(m);
+            }
+        }
+        // Limit 10, random
+        java.util.Collections.shuffle(matches);
+        if (matches.size() > 10) return new LinkedHashSet<>(matches.subList(0, 10));
+        return new LinkedHashSet<>(matches);
+    }
+    
+    // Helper for manual refresh of a genre section - just calls getMoviesForGenre again
+    // since it shuffles internally.
+
+    
 
     private boolean hasGenre(Movie m, String keyword) {
         if (m.getGenres() == null || m.getGenres().isEmpty()) return false;

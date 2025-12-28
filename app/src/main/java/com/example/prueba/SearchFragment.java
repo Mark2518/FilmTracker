@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
+import java.util.Set;
 
 public class SearchFragment extends Fragment {
 
@@ -25,7 +26,7 @@ public class SearchFragment extends Fragment {
     private android.widget.ProgressBar loadingIndicator;
     private int currentOffset = 0;
     private String currentQuery = "";
-    private java.util.List<Movie> currentResults = new java.util.ArrayList<>();
+    private java.util.Set<Movie> currentResults = new java.util.LinkedHashSet<>();
     private boolean isSearching = false;
 
     @Nullable
@@ -66,7 +67,7 @@ public class SearchFragment extends Fragment {
         btnLoadMore.setVisibility(View.GONE);
 
         if (query.isEmpty()) {
-            List<Movie> results = DataRepository.getInstance().getAllMovies();
+            Set<Movie> results = DataRepository.getInstance().getAllMovies();
             currentResults.addAll(results);
             adapter = new MovieAdapter(getContext(), currentResults);
             recyclerView.setAdapter(adapter);
@@ -96,7 +97,7 @@ public class SearchFragment extends Fragment {
 
         DataRepository.getInstance().searchMovies(currentQuery, 20, currentOffset, new DataRepository.SearchCallback() {
             @Override
-            public void onResults(List<Movie> movies) {
+            public void onResults(Set<Movie> movies) {
                 isSearching = false;
                 loadingIndicator.setVisibility(View.GONE);
                 

@@ -41,21 +41,23 @@ public class DetailActivity extends AppCompatActivity {
             updateButtons(btnWatchlist, btnSeen, movie);
 
             btnWatchlist.setOnClickListener(v -> {
-                User user = DataRepository.getInstance().getCurrentUser();
+                DataRepository repo = DataRepository.getInstance();
+                User user = repo.getCurrentUser();
                 if (user.isInWatchlist(movie)) {
-                    user.removeFromWatchlist(movie);
+                    repo.removeFromWatchlist(movie);
                 } else {
-                    user.addToWatchlist(movie);
+                    repo.addToWatchlist(movie);
                 }
                 updateButtons(btnWatchlist, btnSeen, movie);
             });
 
             btnSeen.setOnClickListener(v -> {
-                User user = DataRepository.getInstance().getCurrentUser();
+                DataRepository repo = DataRepository.getInstance();
+                User user = repo.getCurrentUser();
                 if (user.isSeen(movie)) {
-                    user.removeFromSeen(movie);
+                    repo.removeFromSeen(movie);
                 } else {
-                    user.addToSeen(movie);
+                    repo.addToSeen(movie);
                 }
                 updateButtons(btnWatchlist, btnSeen, movie);
             });

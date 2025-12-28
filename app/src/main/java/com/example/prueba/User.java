@@ -1,28 +1,28 @@
 package com.example.prueba;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public class User {
     private String username;
-    private List<Movie> watchlist;
-    private List<Movie> seenList;
+    private Set<Movie> watchlist;
+    private Set<Movie> seenList;
     private java.util.Map<Long, Integer> resumePositions;
-    private List<Movie> resumeMovies;
+    private Set<Movie> resumeMovies;
 
     public User(String username) {
         this.username = username;
-        this.watchlist = new ArrayList<>();
-        this.seenList = new ArrayList<>();
+        this.watchlist = new LinkedHashSet<>();
+        this.seenList = new LinkedHashSet<>();
         this.resumePositions = new java.util.HashMap<>();
-        this.resumeMovies = new ArrayList<>();
+        this.resumeMovies = new LinkedHashSet<>();
     }
 
     public String getUsername() { return username; }
     
-    public List<Movie> getWatchlist() { return watchlist; }
-    public List<Movie> getSeenList() { return seenList; }
-    public List<Movie> getResumeMovies() { return resumeMovies; }
+    public Set<Movie> getWatchlist() { return watchlist; }
+    public Set<Movie> getSeenList() { return seenList; }
+    public Set<Movie> getResumeMovies() { return resumeMovies; }
 
     public void addToWatchlist(Movie movie) {
         if (!watchlist.contains(movie)) {

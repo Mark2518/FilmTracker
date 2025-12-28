@@ -16,9 +16,9 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     private Context context;
     private List<Movie> movieList;
 
-    public MovieAdapter(Context context, List<Movie> movieList) {
+    public MovieAdapter(Context context, java.util.Set<Movie> movieSet) {
         this.context = context;
-        this.movieList = movieList;
+        this.movieList = new java.util.ArrayList<>(movieSet);
     }
 
     @NonNull

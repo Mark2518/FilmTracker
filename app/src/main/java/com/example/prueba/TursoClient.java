@@ -8,6 +8,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +43,7 @@ public class TursoClient {
     }
 
     public interface MovieCallback {
-        void onSuccess(List<Movie> movies);
+        void onSuccess(Set<Movie> movies);
         void onError(Exception e);
     }
 
@@ -138,7 +140,7 @@ public class TursoClient {
                     String responseBody = response.body().string();
                     Log.d("TursoClient", "Response: " + responseBody);
                     
-                    List<Movie> movies = parseTursoResponse(responseBody);
+                    Set<Movie> movies = parseTursoResponse(responseBody);
                     mainHandler.post(() -> callback.onSuccess(movies));
                 }
             } catch (Exception e) {
@@ -148,8 +150,8 @@ public class TursoClient {
         });
     }
 
-    private List<Movie> parseTursoResponse(String jsonResponse) {
-        List<Movie> movies = new ArrayList<>();
+    private Set<Movie> parseTursoResponse(String jsonResponse) {
+        Set<Movie> movies = new LinkedHashSet<>();
         try {
             JsonObject root = JsonParser.parseString(jsonResponse).getAsJsonObject();
             JsonArray results = root.getAsJsonArray("results");
