@@ -33,12 +33,13 @@ public class TursoClient {
 
     public TursoClient() {
         this.client = new OkHttpClient.Builder()
-            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
             .build();
         this.gson = new Gson();
-        this.executor = Executors.newSingleThreadExecutor();
+        // Use CachedThreadPool to allow parallel requests (e.g. search while initial load is happening)
+        this.executor = Executors.newCachedThreadPool();
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
 
@@ -47,15 +48,45 @@ public class TursoClient {
         void onError(Exception e);
     }
 
+    private void ensureIndexes() {
+        // Create an index on title to speed up search queries.
+        // IF NOT EXISTS ensures no error if already there.
+        String sql = "CREATE INDEX IF NOT EXISTS idx_title ON movies(title)";
+        executeSql(sql, new MovieCallback() {
+            @Override
+            public void onSuccess(Set<Movie> movies) {
+                // Index created or existed
+                Log.d("TursoClient", "Index check completed");
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e("TursoClient", "Failed to create index", e);
+            }
+        });
+    }
+
     public void fetchMovies(int limit, int offset, MovieCallback callback) {
         String sql = "SELECT * FROM movies LIMIT " + limit + " OFFSET " + offset;
         executeSql(sql, callback);
     }
 
     public void searchMovies(String query, int limit, int offset, MovieCallback callback) {
+        // Basic sanitization and optimization
+        // Trim to avoid matching leading/trailing spaces unless intended (usually not)
+        String safeQuery = query.trim().replace("'", "''");
+        
+        // Use standard LIMIT to ensure we get *at most* limit, but don't wait for more.
+        // Reverting to LOWER() for maximum robustness in finding specific titles "Spider-Man 3"
+        String sql = "SELECT * FROM movies WHERE LOWER(title) LIKE LOWER('%" + safeQuery + "%') LIMIT " + limit + " OFFSET " + offset;
+        Log.d("TursoClient", "Searching: " + sql);
+        executeSql(sql, callback);
+    }
+
+    public void fetchMoviesByGenre(String genre, int limit, MovieCallback callback) {
         // Basic sanitization
-        String safeQuery = query.replace("'", "''");
-        String sql = "SELECT * FROM movies WHERE title LIKE '%" + safeQuery + "%' LIMIT " + limit + " OFFSET " + offset;
+        String safeGenre = genre.replace("'", "''");
+        String sql = "SELECT * FROM movies WHERE genres LIKE '%" + safeGenre + "%' ORDER BY RANDOM() LIMIT " + limit;
         executeSql(sql, callback);
     }
 

@@ -19,6 +19,7 @@ public class Movie implements Serializable {
     private boolean isSeries;
     private boolean isWatched;
     private boolean isInWatchlist;
+    private boolean isLoading = false;
 
     public Movie(long id, String title, String posterUrl, String backdropUrl, float rating, String description, String year, String director, String duration, String cast, java.util.List<String> genres, boolean isSeries) {
         this.id = id;
@@ -35,7 +36,19 @@ public class Movie implements Serializable {
         this.isSeries = isSeries;
         this.isWatched = false;
         this.isInWatchlist = false;
+        this.isLoading = false;
     }
+
+    // Static factory for loading placeholder
+    public static Movie createLoadingMovie() {
+        Movie m = new Movie(0, "", "", "", 0, "", "", "", "", "", new java.util.ArrayList<>(), false);
+        m.isLoading = true;
+        // Use random negative ID to avoid collision
+        m.id = -(long)(Math.random() * 1000000);
+        return m;
+    }
+
+    public boolean isLoading() { return isLoading; }
 
     // Constructor for backward compatibility (defaults to Movie, random ID if needed but better to enforce ID)
     // We will use hash of title if no ID provided in legacy calls, or 0.

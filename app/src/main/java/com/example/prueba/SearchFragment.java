@@ -81,35 +81,67 @@ public class SearchFragment extends Fragment {
         performSearch();
     }
 
+    private long lastSearchTime = 0;
+
     private void performSearch() {
-        if (isSearching) return;
+        // ALLOW new searches to override old ones.
+        // if (isSearching) return; 
+        
+        // Versioning:
+        final long searchTime = System.currentTimeMillis();
+        lastSearchTime = searchTime;
+        
         isSearching = true;
         
         loadingIndicator.setVisibility(View.VISIBLE);
+        
+        // HYBRID SEARCH:
+        // 1. Instant Local Search
         if (currentOffset == 0) {
-            // Hide list if new search to show clean slate, or keep it? 
-            // Better to clear if new search.
-            // But if we clear here, we might flash empty screen.
-            // Let's rely on clearing in onResults or just replacing.
-        } else {
-            btnLoadMore.setVisibility(View.GONE); // Hide load more while loading next
+            Set<Movie> localResults = DataRepository.getInstance().search(currentQuery);
+            if (!localResults.isEmpty()) {
+                currentResults.clear();
+                currentResults.addAll(localResults);
+                adapter = new MovieAdapter(getContext(), currentResults);
+                recyclerView.setAdapter(adapter);
+            }
+        }
+
+        if (currentOffset > 0) {
+            btnLoadMore.setVisibility(View.GONE);
         }
 
         DataRepository.getInstance().searchMovies(currentQuery, 20, currentOffset, new DataRepository.SearchCallback() {
             @Override
             public void onResults(Set<Movie> movies) {
+                // Check if this result is from the latest search
+                if (searchTime != lastSearchTime) {
+                    // Stale result, ignore
+                    return;
+                }
+                
                 isSearching = false;
                 loadingIndicator.setVisibility(View.GONE);
                 
                 if (currentOffset == 0) {
-                    currentResults.clear();
+                    if (movies.isEmpty() && currentResults.isEmpty()) {
+                         android.widget.Toast.makeText(getContext(), "No se encontraron películas con ese nombre", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                    
                     currentResults.addAll(movies);
-                    adapter = new MovieAdapter(getContext(), currentResults);
-                    recyclerView.setAdapter(adapter);
+                    
+                    if (adapter == null) {
+                        adapter = new MovieAdapter(getContext(), currentResults);
+                        recyclerView.setAdapter(adapter);
+                    } else {
+                        adapter.notifyDataSetChanged();
+                    }
                 } else {
                     int startPos = currentResults.size();
                     currentResults.addAll(movies);
-                    adapter.notifyItemRangeInserted(startPos, movies.size());
+                    if (currentResults.size() > startPos) {
+                        adapter.notifyItemRangeInserted(startPos, currentResults.size() - startPos);
+                    }
                 }
 
                 if (movies.size() == 20) {
@@ -121,11 +153,18 @@ public class SearchFragment extends Fragment {
 
             @Override
             public void onError(String error) {
+                if (searchTime != lastSearchTime) return;
+
                 isSearching = false;
                 loadingIndicator.setVisibility(View.GONE);
-                android.widget.Toast.makeText(getContext(), "Search failed: " + error, android.widget.Toast.LENGTH_SHORT).show();
+                
+                // Only show toast if we have absolutely nothing
+                if (currentResults.isEmpty()) {
+                     android.widget.Toast.makeText(getContext(), "Search failed: " + error, android.widget.Toast.LENGTH_SHORT).show();
+                }
+                
                 if (currentResults.size() > 0 && currentResults.size() % 20 == 0) {
-                     btnLoadMore.setVisibility(View.VISIBLE); // Show retry option if appropriate
+                     btnLoadMore.setVisibility(View.VISIBLE);
                 }
             }
         });

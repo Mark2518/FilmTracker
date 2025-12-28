@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">prueba</string>
+    <string name="button_watchlist">Lista</string>
+    <string name="button_in_watchlist">En Lista</string>
+    <string name="button_seen">Visto</string>
+    <string name="button_in_seen">Visto</string>
+    
+    <string name="added_to_watchlist">Añadido a la Lista de Seguimiento</string>
+    <string name="removed_from_watchlist">Eliminado de la Lista de Seguimiento</string>
+    <string name="added_to_seen">Marcado como Visto</string>
+    <string name="removed_from_seen">Desmarcado de Visto</string>
+    
+    <string name="title_time_invalid">Tiempo Inválido</string>
+    <string name="msg_time_invalid">El tiempo no puede exceder la duración de la película (%1$d m)</string>
+    <string name="msg_invalid_number">Número inválido</string>
+    <string name="btn_save_progress">Guardar Progreso</string>
+    <string name="msg_progress_saved">¡Progreso guardado!</string>
+    <string name="btn_ok">OK</string>
+</resources>

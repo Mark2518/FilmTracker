@@ -36,6 +36,8 @@ public class HomeFragment extends Fragment {
                 
                 LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
                 if (layoutManager != null && dy > 0) { // Scrolling down
+                    // User requested NO updates on scroll. Disabling infinite scroll.
+                    /*
                     int visibleItemCount = layoutManager.getChildCount();
                     int totalItemCount = layoutManager.getItemCount();
                     int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
@@ -44,6 +46,7 @@ public class HomeFragment extends Fragment {
                         && firstVisibleItemPosition >= 0) {
                         loadMoreData();
                     }
+                    */
                 }
             }
         });
@@ -79,6 +82,12 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        // If repository is empty (still loading initial data), do not attempt to refresh recommendations
+        // which would trigger an empty updateUI and clear the loading skeletons.
+        if (DataRepository.getInstance().getAllMovies().isEmpty()) {
+            return;
+        }
+
         // Refresh recommendations when returning to home in case user added movies
         DataRepository.getInstance().loadRecommendations(new DataRepository.DataCallback() {
             @Override
@@ -94,7 +103,8 @@ public class HomeFragment extends Fragment {
     }
 
     private void loadData() {
-        android.widget.Toast.makeText(getContext(), "Loading movies...", android.widget.Toast.LENGTH_SHORT).show();
+        showLoadingState();
+        // android.widget.Toast.makeText(getContext(), "Loading movies...", android.widget.Toast.LENGTH_SHORT).show();
         DataRepository.getInstance().refreshMovies(new DataRepository.DataCallback() {
             @Override
             public void onDataLoaded() {
@@ -128,13 +138,14 @@ public class HomeFragment extends Fragment {
     private void updateUI() {
         categoryList.clear();
         DataRepository repo = DataRepository.getInstance();
-        
+
         // Continue Watching (No refresh needed usually, but could add if desired)
         //Hola
         // Continue Watching (No refresh needed usually, but could add if desired)
         //Hola
         java.util.Set<Movie> continueWatching = repo.getContinueWatchingMovies();
-        if (!continueWatching.isEmpty()) categoryList.add(new Category("Continue Watching", continueWatching));
+        if (!continueWatching.isEmpty())
+            categoryList.add(new Category("Continue Watching", continueWatching));
 
         // Recommendations
         java.util.Set<Movie> recommendations = repo.getRecommendedMovies();
@@ -143,15 +154,17 @@ public class HomeFragment extends Fragment {
         // repo.loadRecommendations handles the initial fetch if empty.
         if (!recommendations.isEmpty()) {
             categoryList.add(new Category("Recomendaciones", recommendations, () -> {
-                android.widget.Toast.makeText(getContext(), "Refresing recommendations...", android.widget.Toast.LENGTH_SHORT).show();
+             android.widget.Toast.makeText(getContext(), "Refresing recommendations...", android.widget.Toast.LENGTH_SHORT).show();
                 repo.refreshRecommendations(new DataRepository.DataCallback() {
                     @Override
                     public void onDataLoaded() {
-                         if (getActivity() != null) updateUI();
+                        if (getActivity() != null) updateCategoryItem("Recomendaciones", repo.getRecommendedMovies());
                     }
+ 
                     @Override
                     public void onError(String error) {
-                        if (getActivity() != null) android.widget.Toast.makeText(getContext(), "Error: " + error, android.widget.Toast.LENGTH_SHORT).show();
+                        if (getActivity() != null)
+                            android.widget.Toast.makeText(getContext(), "Error: " + error, android.widget.Toast.LENGTH_SHORT).show();
                     }
                 });
             }));
@@ -164,51 +177,74 @@ public class HomeFragment extends Fragment {
             if (!genreMovies.isEmpty()) {
                 // Capitalize first letter
                 String title = genre.substring(0, 1).toUpperCase() + genre.substring(1);
-                
+
                 categoryList.add(new Category(title, genreMovies, () -> {
-                   // Refresh this specific genre section
-                   // Since getMoviesForGenre shuffles, we just need to rebuild the category list and notify adapter
-                   // But we can't just call updateUI() because that would refresh EVERYTHING / re-shuffle everything?
-                   // No, getMoviesForGenre shuffles every time it is called.
-                   // If we call updateUI(), all genres will re-shuffle.
-                   // To avoid that, we might strictly need to update just this index, but for simplicity/mvp,
-                   // refreshing one section causing a general UI update is acceptable, 
-                   // OR we can make the "refresh" button just re-fetch this one list and notify adapter.
-                   // For now, let's just trigger a full updateUI for simplicity as it's fast on local cache.
-                   // Actually, if we want to keep others stable, we should implement a specific update.
-                   
-                   // Re-fetching just this genre
-                   if (getActivity() != null) {
-                       java.util.Set<Movie> newMovies = repo.getMoviesForGenre(genre);
-                       // Find the category in the list and update it
-                       for (int i = 0; i < categoryList.size(); i++) {
-                           if (categoryList.get(i).getTitle().equalsIgnoreCase(title)) {
-                               // We need to update the movies in the category object.
-                               // Category object is immutable regarding movie list reference usually, check Category.java
-                               // Category.java has final list? No, just generated in constructor.
-                               // Let's replace the category object in the list.
-                               categoryList.set(i, new Category(title, newMovies, categoryList.get(i).getOnRefresh()));
-                               adapter.notifyItemChanged(i);
-                               break;
-                           }
-                       }
-                   }
+                    // Refresh this specific genre section
+                    // Since getMoviesForGenre shuffles, we just need to rebuild the category list and notify adapter
+                    // But we can't just call updateUI() because that would refresh EVERYTHING / re-shuffle everything?
+                    // No, getMoviesForGenre shuffles every time it is called.
+                    // If we call updateUI(), all genres will re-shuffle.
+                    // To avoid that, we might strictly need to update just this index, but for simplicity/mvp,
+                    // refreshing one section causing a general UI update is acceptable,
+                    // OR we can make the "refresh" button just re-fetch this one list and notify adapter.
+                    // For now, let's just trigger a full updateUI for simplicity as it's fast on local cache.
+                    // Actually, if we want to keep others stable, we should implement a specific update.
+
+                    // Re-fetching just this genre
+                    if (getActivity() != null) {
+                        java.util.Set<Movie> newMovies = repo.getMoviesForGenre(genre);
+                        // Find the category in the list and update it
+                        for (int i = 0; i < categoryList.size(); i++) {
+                            if (categoryList.get(i).getTitle().equalsIgnoreCase(title)) {
+                                // We need to update the movies in the category object.
+                                // Category object is immutable regarding movie list reference usually, check Category.java
+                                // Category.java has final list? No, just generated in constructor.
+                                // Let's replace the category object in the list.
+                                categoryList.set(i, new Category(title, newMovies, categoryList.get(i).getOnRefresh()));
+                                adapter.notifyItemChanged(i);
+                                break;
+                            }
+                        }
+                    }
                 }));
             }
         }
-        
+
         // Fallback or "All Movies" if nothing else? 
         // Requirement says "sections of significant genres".
-        
+
         if (categoryList.isEmpty()) {
-             java.util.Set<Movie> all = repo.getAllMovies();
-             if (!all.isEmpty()) {
-                 List<Movie> allList = new ArrayList<>(all);
-                 List<Movie> subList = allList.subList(0, Math.min(allList.size(), 20));
-                 categoryList.add(new Category("All Content", new java.util.LinkedHashSet<>(subList)));
-             }
+            java.util.Set<Movie> all = repo.getAllMovies();
+            if (!all.isEmpty()) {
+                List<Movie> allList = new ArrayList<>(all);
+                List<Movie> subList = allList.subList(0, Math.min(allList.size(), 20));
+                categoryList.add(new Category("All Content", new java.util.LinkedHashSet<>(subList)));
+            }
         }
 
         adapter.notifyDataSetChanged();
+    }
+        private void showLoadingState() {
+        categoryList.clear();
+        String[] loadingSections = {"Trending", "Action", "Drama", "Comedy", "Sci-Fi"};
+        for (String section : loadingSections) {
+             java.util.Set<Movie> dummyMovies = new java.util.LinkedHashSet<>();
+             for (int i = 0; i < 5; i++) {
+                 dummyMovies.add(Movie.createLoadingMovie());
+             }
+             categoryList.add(new Category(section, dummyMovies));
+        }
+        adapter.notifyDataSetChanged();
+    }
+
+    private void updateCategoryItem(String title, java.util.Set<Movie> newMovies) {
+        for (int i = 0; i < categoryList.size(); i++) {
+            if (categoryList.get(i).getTitle().equalsIgnoreCase(title)) {
+                Category old = categoryList.get(i);
+                categoryList.set(i, new Category(title, newMovies, old.getOnRefresh()));
+                adapter.notifyItemChanged(i);
+                break;
+            }
+        }
     }
 }

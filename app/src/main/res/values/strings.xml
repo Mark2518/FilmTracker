@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">prueba</string>
+    <string name="button_watchlist">Watchlist</string>
+    <string name="button_in_watchlist">In Watchlist</string>
+    <string name="button_seen">Seen</string>
+    <string name="button_in_seen">Seen</string>
+    
+    <string name="added_to_watchlist">Added to Watchlist</string>
+    <string name="removed_from_watchlist">Removed from Watchlist</string>
+    <string name="added_to_seen">Added to Seen</string>
+    <string name="removed_from_seen">Removed from Seen</string>
+    
+    <string name="title_time_invalid">Invalid Time</string>
+    <string name="msg_time_invalid">The time cannot exceed the movie duration (%1$d m)</string>
+    <string name="msg_invalid_number">Invalid number</string>
+    <string name="btn_save_progress">Save Progress</string>
+    <string name="msg_progress_saved">Progress saved!</string>
+    <string name="btn_ok">OK</string>
 </resources>

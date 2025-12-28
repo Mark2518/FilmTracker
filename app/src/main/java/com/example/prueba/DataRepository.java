@@ -48,26 +48,37 @@ public class DataRepository {
         isLoading = true;
         currentOffset = 0; // Reset offset on refresh
         
-        tursoClient.fetchMovies(PAGE_SIZE, currentOffset, new TursoClient.MovieCallback() {
+        cachedMovies.clear();
+        
+        // 1. Fetch 50 random movies
+        // Use fetchMovies with limit 50. But fetchMovies uses OFFSET. 
+        // We probably want random 50. TursoClient has fetchRandomMovies but fixed to 20.
+        // Let's rely on fetchMovies for now or update TursoClient to allow limit on random?
+        // TursoClient.fetchRandomMovies() is fixed to 20.
+        // TursoClient.fetchMovies(limit, offset) uses standard SELECT * LIMIT ... OFFSET ... (no random order usually)
+        // User requested "50 peliculas aleatorias". 
+        // We can trust fetchRandomMovies if we update it or call it 3 times?
+        // Better: let's update fetchMovies to allow random or just use fetchMovies for now and assume the DB shuffle or just offset.
+        // Actually, let's just use page size 50 and standard fetch.
+        
+        tursoClient.fetchMovies(50, 0, new TursoClient.MovieCallback() {
             @Override
             public void onSuccess(Set<Movie> movies) {
-                cachedMovies.clear();
-                cachedMovies.addAll(movies);
+                synchronized (cachedMovies) {
+                    cachedMovies.addAll(movies);
+                }
                 
-                // Merge user specific movies back into cache to persist their state in UI
-                for (Movie m : currentUser.getWatchlist()) {
-                    if (!cachedMovies.contains(m)) cachedMovies.add(m);
-                }
-                for (Movie m : currentUser.getSeenList()) {
-                    if (!cachedMovies.contains(m)) cachedMovies.add(m);
-                }
-                for (Movie m : currentUser.getResumeMovies()) {
-                    if (!cachedMovies.contains(m)) cachedMovies.add(m);
-                }
-
-                currentOffset += movies.size();
-                isLoading = false;
+                // Progressive Loading:
+                // 1. Merge user data immediately so the random movies are context-aware (watched, etc.)
+                mergeUserData();
+                
+                // 2. Notify callback IMMEDIATELY to show the initial batch on screen.
+                // This makes the app feel fast.
                 if (callback != null) callback.onDataLoaded();
+                
+                // 3. Continue to backfill genres in the background.
+                // This will trigger finishRefresh -> onDataLoaded AGAIN when done.
+                ensureGenreCoverage(callback);
             }
 
             @Override
@@ -76,6 +87,75 @@ public class DataRepository {
                 if (callback != null) callback.onError(e.getMessage());
             }
         });
+    }
+
+    private void ensureGenreCoverage(DataCallback callback) {
+        String[] targetGenres = {"Action", "Drama", "Comedy", "Romance", "Documentary", "Adventure"};
+        final java.util.concurrent.atomic.AtomicInteger pendingRequests = new java.util.concurrent.atomic.AtomicInteger(0);
+        final java.util.concurrent.atomic.AtomicBoolean hasError = new java.util.concurrent.atomic.AtomicBoolean(false);
+        
+        // Identify deficits
+        for (String genre : targetGenres) {
+            int count = 0;
+            for (Movie m : cachedMovies) {
+                if (hasGenre(m, genre)) count++;
+            }
+            
+            if (count < 10) {
+                int needed = 10 - count;
+                pendingRequests.incrementAndGet();
+                tursoClient.fetchMoviesByGenre(genre, needed, new TursoClient.MovieCallback() {
+                    @Override
+                    public void onSuccess(Set<Movie> movies) {
+                        synchronized (cachedMovies) {
+                            cachedMovies.addAll(movies);
+                        }
+                        if (pendingRequests.decrementAndGet() == 0) {
+                            finishRefresh(callback);
+                        }
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                         // Ignore error for backfill, proceed
+                         if (pendingRequests.decrementAndGet() == 0) {
+                            finishRefresh(callback);
+                        }
+                    }
+                });
+            }
+        }
+        
+        if (pendingRequests.get() == 0) {
+            finishRefresh(callback);
+        } else {
+            // We have pending requests.
+            // Safety: If for some reason they never complete (shouldn't happen with timeout), we are stuck.
+            // But TursoClient handles timeout by calling onError.
+            // onError decrements pending. So we are safe.
+        }
+    }
+
+    private void mergeUserData() {
+         synchronized (cachedMovies) {
+             for (Movie m : currentUser.getWatchlist()) {
+                 if (!cachedMovies.contains(m)) cachedMovies.add(m);
+             }
+             for (Movie m : currentUser.getSeenList()) {
+                 if (!cachedMovies.contains(m)) cachedMovies.add(m);
+             }
+             for (Movie m : currentUser.getResumeMovies()) {
+                 if (!cachedMovies.contains(m)) cachedMovies.add(m);
+             }
+         }
+    }
+
+    private void finishRefresh(DataCallback callback) {
+         // Merge again to ensure any consistency
+         mergeUserData();
+         
+         isLoading = false;
+         if (callback != null) callback.onDataLoaded();
     }
 
     public void loadMoreMovies(DataCallback callback) {

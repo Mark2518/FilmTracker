@@ -20,6 +20,20 @@
             app:layout_constraintTop_toTopOf="parent"
             android:contentDescription="Backdrop" />
 
+        <Button
+            android:id="@+id/btn_language"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:text="EN/ES"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#445566"
+            android:minHeight="40dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
         <androidx.cardview.widget.CardView
             android:id="@+id/poster_card"
             android:layout_width="120dp"
