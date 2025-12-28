@@ -3,7 +3,6 @@ package com.example.prueba;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -15,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -27,18 +25,15 @@ public class TursoClient {
     private static final String TURSO_TOKEN = "Bearer " + BuildConfig.TURSO_TOKEN;
 
     private final OkHttpClient client;
-    private final Gson gson;
     private final ExecutorService executor;
     private final Handler mainHandler;
 
     public TursoClient() {
         this.client = new OkHttpClient.Builder()
-            .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-            .build();
-        this.gson = new Gson();
-        // Use CachedThreadPool to allow parallel requests (e.g. search while initial load is happening)
+                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
         this.executor = Executors.newCachedThreadPool();
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
@@ -48,134 +43,88 @@ public class TursoClient {
         void onError(Exception e);
     }
 
-    private void ensureIndexes() {
-        // Create an index on title to speed up search queries.
-        // IF NOT EXISTS ensures no error if already there.
-        String sql = "CREATE INDEX IF NOT EXISTS idx_title ON movies(title)";
-        executeSql(sql, new MovieCallback() {
-            @Override
-            public void onSuccess(Set<Movie> movies) {
-                // Index created or existed
-                Log.d("TursoClient", "Index check completed");
-            }
-
-            @Override
-            public void onError(Exception e) {
-                Log.e("TursoClient", "Failed to create index", e);
-            }
-        });
-    }
-
+    // --- MÉTODOS DE BÚSQUEDA ---
     public void fetchMovies(int limit, int offset, MovieCallback callback) {
-        String sql = "SELECT * FROM movies LIMIT " + limit + " OFFSET " + offset;
-        executeSql(sql, callback);
-    }
-
-    public void searchMovies(String query, int limit, int offset, MovieCallback callback) {
-        // Basic sanitization and optimization
-        // Trim to avoid matching leading/trailing spaces unless intended (usually not)
-        String safeQuery = query.trim().replace("'", "''");
-        
-        // Use standard LIMIT to ensure we get *at most* limit, but don't wait for more.
-        // Reverting to LOWER() for maximum robustness in finding specific titles "Spider-Man 3"
-        String sql = "SELECT * FROM movies WHERE LOWER(title) LIKE LOWER('%" + safeQuery + "%') LIMIT " + limit + " OFFSET " + offset;
-        Log.d("TursoClient", "Searching: " + sql);
-        executeSql(sql, callback);
-    }
-
-    public void fetchMoviesByGenre(String genre, int limit, MovieCallback callback) {
-        // Basic sanitization
-        String safeGenre = genre.replace("'", "''");
-        String sql = "SELECT * FROM movies WHERE genres LIKE '%" + safeGenre + "%' ORDER BY RANDOM() LIMIT " + limit;
+        String sql = "SELECT rowid, * FROM peliculas LIMIT " + limit + " OFFSET " + offset;
         executeSql(sql, callback);
     }
 
     public void fetchRandomMovies(MovieCallback callback) {
-        String sql = "SELECT * FROM movies ORDER BY RANDOM() LIMIT 20";
+        String sql = "SELECT rowid, * FROM peliculas ORDER BY RANDOM() LIMIT 20";
         executeSql(sql, callback);
     }
 
+    public void fetchMoviesByGenre(String genre, int limit, MovieCallback callback) {
+        String safeGenre = genre.replace("'", "''");
+        String sql = "SELECT rowid, * FROM peliculas WHERE genres LIKE '%" + safeGenre + "%' ORDER BY RANDOM() LIMIT " + limit;
+        executeSql(sql, callback);
+    }
+
+    public void searchMovies(String query, int limit, int offset, MovieCallback callback) {
+        String safeQuery = query.trim().replace("'", "''");
+        if (safeQuery.isEmpty()) {
+            mainHandler.post(() -> callback.onSuccess(new LinkedHashSet<>()));
+            return;
+        }
+
+        String[] terms = safeQuery.split("\\s+");
+        StringBuilder sqlBuilder = new StringBuilder();
+        sqlBuilder.append("SELECT rowid, * FROM peliculas WHERE ");
+
+        for (int i = 0; i < terms.length; i++) {
+            if (i > 0) sqlBuilder.append(" AND ");
+            String termClean = terms[i].toLowerCase().replace("-", "").replace(":", "");
+            sqlBuilder.append("(LOWER(REPLACE(REPLACE(title, '-', ''), ' ', '')) LIKE '%")
+                    .append(termClean).append("%')");
+        }
+        sqlBuilder.append(" LIMIT ").append(limit).append(" OFFSET ").append(offset);
+        executeSql(sqlBuilder.toString(), callback);
+    }
+
+    // (Opcional) fetchRecommendations simplificado
     public void fetchRecommendations(List<String> genres, List<String> titleKeywords, MovieCallback callback) {
-        if ((genres == null || genres.isEmpty()) && (titleKeywords == null || titleKeywords.isEmpty())) {
+        if (genres == null || genres.isEmpty()) {
             fetchRandomMovies(callback);
             return;
         }
-        
-        // Take top 3 of each to avoid huge query
-        List<String> topGenres = (genres != null && genres.size() > 3) ? genres.subList(0, 3) : (genres != null ? genres : new ArrayList<>());
-        List<String> topKeywords = (titleKeywords != null && titleKeywords.size() > 3) ? titleKeywords.subList(0, 3) : (titleKeywords != null ? titleKeywords : new ArrayList<>());
+        List<String> topGenres = (genres.size() > 3) ? genres.subList(0, 3) : genres;
 
-        StringBuilder sb = new StringBuilder("SELECT * FROM movies WHERE ");
-        boolean hasConditions = false;
-
-        if (!topGenres.isEmpty()) {
-            sb.append("(");
-            for (int i = 0; i < topGenres.size(); i++) {
-                String g = topGenres.get(i).replace("'", "''").trim();
-                sb.append("genre LIKE '%").append(g).append("%'");
-                if (i < topGenres.size() - 1) {
-                    sb.append(" OR ");
-                }
-            }
-            sb.append(")");
-            hasConditions = true;
+        StringBuilder sb = new StringBuilder("SELECT rowid, * FROM peliculas WHERE ");
+        sb.append("(");
+        for (int i = 0; i < topGenres.size(); i++) {
+            String g = topGenres.get(i).replace("'", "''").trim();
+            sb.append("genres LIKE '%").append(g).append("%'");
+            if (i < topGenres.size() - 1) sb.append(" OR ");
         }
-
-        if (!topKeywords.isEmpty()) {
-            if (hasConditions) sb.append(" OR ");
-            sb.append("(");
-            for (int i = 0; i < topKeywords.size(); i++) {
-                String k = topKeywords.get(i).replace("'", "''").trim();
-                sb.append("title LIKE '%").append(k).append("%'");
-                if (i < topKeywords.size() - 1) {
-                    sb.append(" OR ");
-                }
-            }
-            sb.append(")");
-        }
-
-        sb.append(" ORDER BY RANDOM() LIMIT 20");
+        sb.append(") ORDER BY RANDOM() LIMIT 20");
         executeSql(sb.toString(), callback);
     }
 
+    // --- PARSEO Y EJECUCIÓN ---
     private void executeSql(String sql, MovieCallback callback) {
         executor.execute(() -> {
             try {
-                // Construct JSON Body for Turso
                 JsonObject stmt = new JsonObject();
                 stmt.addProperty("sql", sql);
-                
                 JsonObject executeRequest = new JsonObject();
                 executeRequest.addProperty("type", "execute");
                 executeRequest.add("stmt", stmt);
-                
                 JsonArray requests = new JsonArray();
                 requests.add(executeRequest);
-                
                 JsonObject root = new JsonObject();
                 root.add("requests", requests);
-                
+
                 RequestBody body = RequestBody.create(root.toString(), MediaType.get("application/json; charset=utf-8"));
-                
                 Request request = new Request.Builder()
-                        .url(TURSO_URL)
-                        .addHeader("Authorization", TURSO_TOKEN)
-                        .post(body)
-                        .build();
+                        .url(TURSO_URL).addHeader("Authorization", TURSO_TOKEN).post(body).build();
 
                 try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) {
-                        throw new IOException("Unexpected code " + response);
-                    }
-                    
-                    String responseBody = response.body().string();
-                    Log.d("TursoClient", "Response: " + responseBody);
-                    
-                    Set<Movie> movies = parseTursoResponse(responseBody);
+                    if (!response.isSuccessful()) throw new IOException("Error HTTP: " + response);
+                    Set<Movie> movies = parseTursoResponse(response.body().string());
                     mainHandler.post(() -> callback.onSuccess(movies));
                 }
             } catch (Exception e) {
-                Log.e("TursoClient", "Error executing SQL: " + sql, e);
+                Log.e("TursoClient", "Error", e);
                 mainHandler.post(() -> callback.onError(e));
             }
         });
@@ -186,125 +135,81 @@ public class TursoClient {
         try {
             JsonObject root = JsonParser.parseString(jsonResponse).getAsJsonObject();
             JsonArray results = root.getAsJsonArray("results");
-            
             if (results.size() > 0) {
-                JsonObject result = results.get(0).getAsJsonObject();
-                
-                // Check if there is an error in the response item
-                if (result.has("error")) {
-                    Log.e("TursoClient", "SQL Error: " + result.get("error").toString());
-                    return movies;
-                }
-                
-                JsonObject responseObj = result.getAsJsonObject("response");
-                if (responseObj == null) {
-                    // Sometimes direct result if not batched exactly same way? 
-                    // Turso v2 pipeline structure:
-                    // { "results": [ { "type": "ok", "response": { "cols": [...], "rows": [...] } } ] }
-                    return movies;
-                }
-                
-                // Correctly extracting the result object
+                JsonObject resultItem = results.get(0).getAsJsonObject();
+                if (resultItem.has("error")) return movies;
 
+                JsonObject responseObj = resultItem.getAsJsonObject("response");
+                if (responseObj == null) return movies;
                 JsonObject innerResult = responseObj.getAsJsonObject("result");
                 JsonArray cols = innerResult.getAsJsonArray("cols");
                 JsonArray rows = innerResult.getAsJsonArray("rows");
 
-                // Map column names to indices
-                int colId = -1, colTitle = -1, colRuntime = -1, colOverview = -1, colPoster = -1, colBackdrop = -1, colRating = -1, colYear = -1, colDirector = -1, colCast = -1, colIsSeries = -1, colGenre = -1;
-                
+                int colId = -1, colTitle = -1, colRuntime = -1, colOverview = -1, colPoster = -1, colGenre = -1;
                 for (int i = 0; i < cols.size(); i++) {
-                    JsonObject col = cols.get(i).getAsJsonObject();
-                    String name = col.get("name").getAsString();
+                    String name = cols.get(i).getAsJsonObject().get("name").getAsString();
                     switch (name) {
-                        case "id": colId = i; break;
+                        case "rowid": colId = i; break;
                         case "title": colTitle = i; break;
                         case "runtime": colRuntime = i; break;
                         case "overview": colOverview = i; break;
                         case "poster_path": colPoster = i; break;
-                        case "backdrop_url": colBackdrop = i; break;
-                        case "rating": colRating = i; break;
-                        case "year": colYear = i; break;
-                        case "director": colDirector = i; break;
-                        case "cast": colCast = i; break;
-                        case "is_series": colIsSeries = i; break;
-                        case "genre": 
                         case "genres": colGenre = i; break;
                     }
                 }
 
                 for (JsonElement rowElem : rows) {
                     JsonArray row = rowElem.getAsJsonArray();
-                    // Extract values based on indices. CAREFUL: value types (type: "integer", value: "1") or just raw values?
-                    // LibSQL usually returns raw values in rows array: [ 1, "Inception", ... ]
-                    
                     try {
-                        long id = getLong(row, colId);
                         String title = getString(row, colTitle);
+                        long id = (colId != -1) ? getLong(row, colId) : title.hashCode();
                         int runtime = getInt(row, colRuntime);
                         String overview = getString(row, colOverview);
-                        String posterPath = getString(row, colPoster);
+                        String rawPoster = getString(row, colPoster);
+
+                        // Parseo de géneros
                         String genreStr = getString(row, colGenre);
                         List<String> genreList = new ArrayList<>();
-                        if (genreStr != null && !genreStr.isEmpty()) {
-                            for (String g : genreStr.split(",")) {
-                                genreList.add(g.trim());
-                            }
+                        if (!genreStr.isEmpty()) {
+                            String cleanGenres = genreStr.replace("[", "").replace("]", "").replace("'", "");
+                            for (String g : cleanGenres.split(",")) genreList.add(g.trim());
                         }
-                        
-                        // Construct URLs
-                        String fullPosterUrl = posterPath.startsWith("http") ? posterPath : "https://image.tmdb.org/t/p/w500" + posterPath;
-                        String fullBackdropUrl = "https://image.tmdb.org/t/p/w1280" + posterPath; // Mocking backdrop if empty
-                        
-                        // Parse duration
+
+
+
+
                         int hours = runtime / 60;
                         int minutes = runtime % 60;
-                        String durationStr = hours + "h " + minutes + "m";
-                        
-                        Movie m = new Movie(
-                            id,
-                            title,
-                            fullPosterUrl,
-                            fullBackdropUrl,
-                            0.0f, // Default rating if DB is null, or extract from db if present
-                            overview,
-                            "", // Year
-                            "", // Director
-                            durationStr,
-                            "", // Cast
-                            genreList, // Genre List
-                            false // isSeries check if column exists
-                        );
-                        movies.add(m);
+                        String durationStr = (hours > 0 ? hours + "h " : "") + minutes + "m";
+
+                        // AQUÍ: Usamos el nuevo constructor limpio
+                        movies.add(new Movie(id, title, rawPoster, overview, durationStr, genreList));
+
                     } catch (Exception e) {
-                        Log.e("TursoParsing", "Error parsing row", e);
+                        Log.e("TursoParsing", "Skip row", e);
                     }
                 }
             }
-        } catch (Exception e) {
-            Log.e("TursoParsing", "JSON structure mismatch", e);
-        }
+        } catch (Exception e) { Log.e("TursoParsing", "Error JSON", e); }
         return movies;
     }
-    
+
     private String getString(JsonArray row, int index) {
         if (index == -1 || index >= row.size() || row.get(index).isJsonNull()) return "";
         JsonElement el = row.get(index);
-        if (el.isJsonObject() && el.getAsJsonObject().has("value")) return el.getAsJsonObject().get("value").getAsString(); // Sometimes enclosed
+        if (el.isJsonObject() && el.getAsJsonObject().has("value")) return el.getAsJsonObject().get("value").getAsString();
         return el.getAsString();
     }
-
     private long getLong(JsonArray row, int index) {
         if (index == -1 || index >= row.size() || row.get(index).isJsonNull()) return 0;
         JsonElement el = row.get(index);
-        if (el.isJsonObject() && el.getAsJsonObject().has("value")) return el.getAsJsonObject().get("value").getAsLong();
-        return el.getAsLong();
+        String val = (el.isJsonObject() && el.getAsJsonObject().has("value")) ? el.getAsJsonObject().get("value").getAsString() : el.getAsString();
+        try { return Long.parseLong(val); } catch (Exception e) { return 0; }
     }
-    
     private int getInt(JsonArray row, int index) {
         if (index == -1 || index >= row.size() || row.get(index).isJsonNull()) return 0;
         JsonElement el = row.get(index);
-        if (el.isJsonObject() && el.getAsJsonObject().has("value")) return el.getAsJsonObject().get("value").getAsInt();
-        return el.getAsInt();
+        String val = (el.isJsonObject() && el.getAsJsonObject().has("value")) ? el.getAsJsonObject().get("value").getAsString() : el.getAsString();
+        try { return Integer.parseInt(val); } catch (Exception e) { return 0; }
     }
 }

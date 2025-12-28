@@ -33,7 +33,7 @@ public class DataRepository {
     public void init(android.content.Context context) {
         // Context not strictly needed for Turso HTTP client unless using ConnectivityManager
     }
-    
+
     public interface DataCallback {
         void onDataLoaded();
         void onError(String error);
@@ -47,35 +47,25 @@ public class DataRepository {
         if (isLoading) return;
         isLoading = true;
         currentOffset = 0; // Reset offset on refresh
-        
+
         cachedMovies.clear();
-        
-        // 1. Fetch 50 random movies
-        // Use fetchMovies with limit 50. But fetchMovies uses OFFSET. 
-        // We probably want random 50. TursoClient has fetchRandomMovies but fixed to 20.
-        // Let's rely on fetchMovies for now or update TursoClient to allow limit on random?
-        // TursoClient.fetchRandomMovies() is fixed to 20.
-        // TursoClient.fetchMovies(limit, offset) uses standard SELECT * LIMIT ... OFFSET ... (no random order usually)
-        // User requested "50 peliculas aleatorias". 
-        // We can trust fetchRandomMovies if we update it or call it 3 times?
-        // Better: let's update fetchMovies to allow random or just use fetchMovies for now and assume the DB shuffle or just offset.
-        // Actually, let's just use page size 50 and standard fetch.
-        
+
+
         tursoClient.fetchMovies(50, 0, new TursoClient.MovieCallback() {
             @Override
             public void onSuccess(Set<Movie> movies) {
                 synchronized (cachedMovies) {
                     cachedMovies.addAll(movies);
                 }
-                
+
                 // Progressive Loading:
                 // 1. Merge user data immediately so the random movies are context-aware (watched, etc.)
                 mergeUserData();
-                
+
                 // 2. Notify callback IMMEDIATELY to show the initial batch on screen.
                 // This makes the app feel fast.
                 if (callback != null) callback.onDataLoaded();
-                
+
                 // 3. Continue to backfill genres in the background.
                 // This will trigger finishRefresh -> onDataLoaded AGAIN when done.
                 ensureGenreCoverage(callback);
@@ -93,14 +83,14 @@ public class DataRepository {
         String[] targetGenres = {"Action", "Drama", "Comedy", "Romance", "Documentary", "Adventure"};
         final java.util.concurrent.atomic.AtomicInteger pendingRequests = new java.util.concurrent.atomic.AtomicInteger(0);
         final java.util.concurrent.atomic.AtomicBoolean hasError = new java.util.concurrent.atomic.AtomicBoolean(false);
-        
+
         // Identify deficits
         for (String genre : targetGenres) {
             int count = 0;
             for (Movie m : cachedMovies) {
                 if (hasGenre(m, genre)) count++;
             }
-            
+
             if (count < 10) {
                 int needed = 10 - count;
                 pendingRequests.incrementAndGet();
@@ -125,7 +115,7 @@ public class DataRepository {
                 });
             }
         }
-        
+
         if (pendingRequests.get() == 0) {
             finishRefresh(callback);
         } else {
@@ -153,7 +143,7 @@ public class DataRepository {
     private void finishRefresh(DataCallback callback) {
          // Merge again to ensure any consistency
          mergeUserData();
-         
+
          isLoading = false;
          if (callback != null) callback.onDataLoaded();
     }
@@ -241,13 +231,27 @@ public class DataRepository {
 
     public Set<Movie> search(String query) {
         // Local filter as fallback or for instant results
+        // Normalize query and title by removing accents, hyphens, and spaces for flexible search
+        String normalizedQuery = normalizeForSearch(query);
         Set<Movie> results = new LinkedHashSet<>();
         for (Movie m : cachedMovies) {
-            if (m.getTitle().toLowerCase().contains(query.toLowerCase())) {
+            String normalizedTitle = normalizeForSearch(m.getTitle());
+            if (normalizedTitle.contains(normalizedQuery)) {
                 results.add(m);
             }
         }
         return results;
+    }
+
+    private String normalizeForSearch(String s) {
+        return s.toLowerCase()
+                .replace("-", "").replace(" ", "")
+                .replace("á", "a").replace("à", "a").replace("ä", "a").replace("â", "a")
+                .replace("é", "e").replace("è", "e").replace("ë", "e").replace("ê", "e")
+                .replace("í", "i").replace("ì", "i").replace("ï", "i").replace("î", "i")
+                .replace("ó", "o").replace("ò", "o").replace("ö", "o").replace("ô", "o")
+                .replace("ú", "u").replace("ù", "u").replace("ü", "u").replace("û", "u")
+                .replace("ñ", "n");
     }
 
     public interface SearchCallback {
@@ -332,7 +336,7 @@ public class DataRepository {
         // Actually, the request says "random 20 initially" or "same genres as seen/watchlist".
 
         Set<Movie> candidates = new LinkedHashSet<>();
-        
+
         Set<String> targetGenres = new LinkedHashSet<>();
         java.util.Map<String, Integer> genreCounts = new java.util.HashMap<>();
         addGenresToCount(currentUser.getSeenList(), genreCounts);
@@ -351,7 +355,7 @@ public class DataRepository {
             for (Movie m : cachedMovies) {
                 // Don't recommend what is already seen or in watchlist
                 if (currentUser.isSeen(m) || currentUser.isInWatchlist(m)) continue;
-                
+
                 if (hasAnyGenre(m, targetGenres)) {
                     if (!candidates.contains(m)) candidates.add(m);
                 }
@@ -374,11 +378,11 @@ public class DataRepository {
         for (int i = 0; i < Math.min(candidateList.size(), 20); i++) {
             recommendedMovies.add(candidateList.get(i));
         }
-        
+
         recommendationsDirty = false;
         if (callback != null) callback.onDataLoaded();
     }
-    
+
     private void addGenresToCount(java.util.Collection<Movie> movies, java.util.Map<String, Integer> counts) {
         for (Movie m : movies) {
             if (m.getGenres() != null && !m.getGenres().isEmpty()) {
@@ -417,10 +421,10 @@ public class DataRepository {
     public List<String> getSignificantGenres() {
         java.util.Map<String, Integer> counts = new java.util.HashMap<>();
         addGenresToCount(cachedMovies, counts);
-        
+
         List<String> sorted = new ArrayList<>(counts.keySet());
         sorted.sort((a, b) -> counts.get(b) - counts.get(a));
-        
+
         // Return top 5 or so
         if (sorted.size() > 5) return sorted.subList(0, 5);
         return sorted;
@@ -438,11 +442,11 @@ public class DataRepository {
         if (matches.size() > 10) return new LinkedHashSet<>(matches.subList(0, 10));
         return new LinkedHashSet<>(matches);
     }
-    
+
     // Helper for manual refresh of a genre section - just calls getMoviesForGenre again
     // since it shuffles internally.
 
-    
+
 
     private boolean hasGenre(Movie m, String keyword) {
         if (m.getGenres() == null || m.getGenres().isEmpty()) return false;

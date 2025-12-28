@@ -1,18 +1,23 @@
 package com.example.prueba;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ProgressBar;
+import android.widget.Button;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class SearchFragment extends Fragment {
@@ -20,14 +25,16 @@ public class SearchFragment extends Fragment {
     private RecyclerView recyclerView;
     private MovieAdapter adapter;
     private EditText searchInput;
+    private Button btnLoadMore;
+    private ProgressBar loadingIndicator;
 
-    @Nullable
-    private android.widget.Button btnLoadMore;
-    private android.widget.ProgressBar loadingIndicator;
     private int currentOffset = 0;
     private String currentQuery = "";
-    private java.util.Set<Movie> currentResults = new java.util.LinkedHashSet<>();
-    private boolean isSearching = false;
+    private Set<Movie> currentResults = new LinkedHashSet<>();
+    
+    // Handler para controlar el tiempo de escritura (Debounce)
+    private Handler searchHandler = new Handler(Looper.getMainLooper());
+    private Runnable searchRunnable;
 
     @Nullable
     @Override
@@ -41,18 +48,30 @@ public class SearchFragment extends Fragment {
         
         recyclerView.setLayoutManager(new GridLayoutManager(getContext(), 3));
 
-        // Initial load (empty or popular)
+        // 1. Inicializamos el adaptador UNA sola vez
+        adapter = new MovieAdapter(getContext(), currentResults);
+        recyclerView.setAdapter(adapter);
+
+        // Cargar estado inicial (vacío o todas las pelis)
         updateList("");
 
-        searchInput.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH ||
-                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
-                (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER && event.getAction() == android.view.KeyEvent.ACTION_DOWN)) {
-                
-                updateList(v.getText().toString());
-                return true;
+        // 2. Listener para búsqueda en tiempo real
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // Si el usuario sigue escribiendo, cancelamos la búsqueda anterior
+                if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
             }
-            return false;
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                // Esperamos 600ms después de que deje de escribir para buscar
+                searchRunnable = () -> updateList(s.toString());
+                searchHandler.postDelayed(searchRunnable, 600);
+            }
         });
 
         btnLoadMore.setOnClickListener(v -> loadMore());
@@ -61,16 +80,16 @@ public class SearchFragment extends Fragment {
     }
 
     private void updateList(String query) {
-        currentQuery = query;
+        currentQuery = query.trim();
         currentOffset = 0;
-        currentResults.clear();
-        btnLoadMore.setVisibility(View.GONE);
-
-        if (query.isEmpty()) {
-            Set<Movie> results = DataRepository.getInstance().getAllMovies();
-            currentResults.addAll(results);
-            adapter = new MovieAdapter(getContext(), currentResults);
-            recyclerView.setAdapter(adapter);
+        
+        if (currentQuery.isEmpty()) {
+            btnLoadMore.setVisibility(View.GONE);
+            loadingIndicator.setVisibility(View.GONE);
+            // Mostrar todas las películas cacheadas si no hay búsqueda
+            currentResults.clear();
+            currentResults.addAll(DataRepository.getInstance().getAllMovies());
+            adapter.updateMovies(currentResults);
         } else {
             performSearch();
         }
@@ -81,70 +100,46 @@ public class SearchFragment extends Fragment {
         performSearch();
     }
 
-    private long lastSearchTime = 0;
-
     private void performSearch() {
-        // ALLOW new searches to override old ones.
-        // if (isSearching) return; 
-        
-        // Versioning:
-        final long searchTime = System.currentTimeMillis();
-        lastSearchTime = searchTime;
-        
-        isSearching = true;
-        
         loadingIndicator.setVisibility(View.VISIBLE);
         
-        // HYBRID SEARCH:
-        // 1. Instant Local Search
+        // PASO 1: Búsqueda Local Instantánea (para que se sienta rápido)
         if (currentOffset == 0) {
             Set<Movie> localResults = DataRepository.getInstance().search(currentQuery);
-            if (!localResults.isEmpty()) {
-                currentResults.clear();
-                currentResults.addAll(localResults);
-                adapter = new MovieAdapter(getContext(), currentResults);
-                recyclerView.setAdapter(adapter);
-            }
+            currentResults.clear();
+            currentResults.addAll(localResults);
+            adapter.updateMovies(currentResults);
         }
 
-        if (currentOffset > 0) {
-            btnLoadMore.setVisibility(View.GONE);
-        }
-
+        // PASO 2: Búsqueda en la Base de Datos (Turso)
         DataRepository.getInstance().searchMovies(currentQuery, 20, currentOffset, new DataRepository.SearchCallback() {
             @Override
             public void onResults(Set<Movie> movies) {
-                // Check if this result is from the latest search
-                if (searchTime != lastSearchTime) {
-                    // Stale result, ignore
-                    return;
-                }
-                
-                isSearching = false;
+                if (!isAdded()) return; // Evitar crash si el usuario cambió de pantalla
+
                 loadingIndicator.setVisibility(View.GONE);
                 
                 if (currentOffset == 0) {
-                    if (movies.isEmpty() && currentResults.isEmpty()) {
-                         android.widget.Toast.makeText(getContext(), "No se encontraron películas con ese nombre", android.widget.Toast.LENGTH_SHORT).show();
-                    }
-                    
-                    currentResults.addAll(movies);
-                    
-                    if (adapter == null) {
-                        adapter = new MovieAdapter(getContext(), currentResults);
-                        recyclerView.setAdapter(adapter);
-                    } else {
-                        adapter.notifyDataSetChanged();
+                    // Si es una búsqueda nueva, la API manda sobre lo local
+                    if (!movies.isEmpty()) {
+                        // Opcional: Si quieres mezclar, comenta el clear(). 
+                        // Pero para búsquedas, mejor mostrar exactamente lo que viene.
+                        currentResults.clear(); 
+                        currentResults.addAll(movies);
+                    } else if (currentResults.isEmpty()) {
+                         // Si API devuelve 0 y local tenía 0 -> No hay nada
+                         Toast.makeText(getContext(), "No se encontraron resultados", Toast.LENGTH_SHORT).show();
                     }
                 } else {
-                    int startPos = currentResults.size();
+                    // Si es "cargar más", añadimos al final
                     currentResults.addAll(movies);
-                    if (currentResults.size() > startPos) {
-                        adapter.notifyItemRangeInserted(startPos, currentResults.size() - startPos);
-                    }
                 }
 
-                if (movies.size() == 20) {
+                // Actualizamos el adaptador existente
+                adapter.updateMovies(currentResults);
+
+                // Gestionar botón de ver más
+                if (movies.size() >= 20) {
                     btnLoadMore.setVisibility(View.VISIBLE);
                 } else {
                     btnLoadMore.setVisibility(View.GONE);
@@ -153,18 +148,11 @@ public class SearchFragment extends Fragment {
 
             @Override
             public void onError(String error) {
-                if (searchTime != lastSearchTime) return;
-
-                isSearching = false;
+                if (!isAdded()) return;
                 loadingIndicator.setVisibility(View.GONE);
-                
-                // Only show toast if we have absolutely nothing
+                // Si falla la red, al menos ya mostramos los resultados locales en el PASO 1
                 if (currentResults.isEmpty()) {
-                     android.widget.Toast.makeText(getContext(), "Search failed: " + error, android.widget.Toast.LENGTH_SHORT).show();
-                }
-                
-                if (currentResults.size() > 0 && currentResults.size() % 20 == 0) {
-                     btnLoadMore.setVisibility(View.VISIBLE);
+                    Toast.makeText(getContext(), "Error de conexión", Toast.LENGTH_SHORT).show();
                 }
             }
         });

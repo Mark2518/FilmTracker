@@ -30,7 +30,19 @@ public class DetailActivity extends AppCompatActivity {
             android.widget.Button btnLanguage = findViewById(R.id.btn_language);
 
             title.setText(movie.getTitle());
-            yearDirector.setText(movie.getYear() + " • " + movie.getDuration() + " • " + movie.getDirector());
+            StringBuilder yearDirectorText = new StringBuilder();
+            if (!movie.getYear().isEmpty()) {
+                yearDirectorText.append(movie.getYear());
+            }
+            if (!movie.getDuration().isEmpty()) {
+                if (yearDirectorText.length() > 0) yearDirectorText.append(" • ");
+                yearDirectorText.append(movie.getDuration());
+            }
+            if (!movie.getDirector().isEmpty()) {
+                if (yearDirectorText.length() > 0) yearDirectorText.append(" • ");
+                yearDirectorText.append(movie.getDirector());
+            }
+            yearDirector.setText(yearDirectorText.toString());
             if (movie.getGenres() != null && !movie.getGenres().isEmpty()) {
                 genreView.setText(android.text.TextUtils.join(", ", movie.getGenres()));
                 genreView.setVisibility(android.view.View.VISIBLE);

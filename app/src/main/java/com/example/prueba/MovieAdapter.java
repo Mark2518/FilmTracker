@@ -10,16 +10,26 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import java.util.List;
+import java.util.Set;
+import java.util.ArrayList;
 
 public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHolder> {
 
     private Context context;
     private List<Movie> movieList;
 
-    public MovieAdapter(Context context, java.util.Set<Movie> movieSet) {
+    public MovieAdapter(Context context, Set<Movie> movieSet) {
         this.context = context;
-        this.movieList = new java.util.ArrayList<>(movieSet);
+        this.movieList = new ArrayList<>(movieSet);
     }
+
+    // --- NUEVO MÉTODO: Esto es lo que faltaba ---
+    public void updateMovies(Set<Movie> newMovies) {
+        this.movieList.clear();
+        this.movieList.addAll(newMovies);
+        notifyDataSetChanged();
+    }
+    // ---------------------------------------------
 
     @NonNull
     @Override
@@ -31,16 +41,25 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     @Override
     public void onBindViewHolder(@NonNull MovieViewHolder holder, int position) {
         Movie movie = movieList.get(position);
-        Glide.with(context)
-                .load(movie.getPosterUrl())
-                .centerCrop()
-                .placeholder(android.R.drawable.ic_menu_gallery)
-                .into(holder.poster);
+        
+        // Cargar imagen o un placeholder si está cargando
+        if (movie.isLoading()) {
+             // Aquí podrías poner una imagen de loading específica
+             holder.poster.setImageResource(android.R.drawable.ic_menu_help); 
+        } else {
+            Glide.with(context)
+                    .load(movie.getPosterUrl())
+                    .centerCrop()
+                    .placeholder(android.R.drawable.ic_menu_gallery)
+                    .into(holder.poster);
+        }
 
         holder.itemView.setOnClickListener(v -> {
-            Intent intent = new Intent(context, DetailActivity.class);
-            intent.putExtra("movie", movie);
-            context.startActivity(intent);
+            if (!movie.isLoading()) {
+                Intent intent = new Intent(context, DetailActivity.class);
+                intent.putExtra("movie", movie);
+                context.startActivity(intent);
+            }
         });
     }
 
