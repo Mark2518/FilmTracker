@@ -28,9 +28,69 @@ public class HomeFragment extends Fragment {
         adapter = new CategoryAdapter(getContext(), categoryList);
         recyclerView.setAdapter(adapter);
 
+        // Infinite Scroll Listener
+        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager != null && dy > 0) { // Scrolling down
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
+                    
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount 
+                        && firstVisibleItemPosition >= 0) {
+                        loadMoreData();
+                    }
+                }
+            }
+        });
+
         loadData();
         
         return view;
+    }
+    
+    private boolean isLoadingMore = false;
+    
+    private void loadMoreData() {
+        if (isLoadingMore) return;
+        isLoadingMore = true;
+        
+        DataRepository.getInstance().loadMoreMovies(new DataRepository.DataCallback() {
+            @Override
+            public void onDataLoaded() {
+                isLoadingMore = false;
+                if (getActivity() != null) {
+                    updateUI();
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                isLoadingMore = false;
+                // Optional: show error or just ignore for seamless experience
+            }
+        });
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh recommendations when returning to home in case user added movies
+        DataRepository.getInstance().loadRecommendations(new DataRepository.DataCallback() {
+            @Override
+            public void onDataLoaded() {
+                if (getActivity() != null) updateUI();
+            }
+
+            @Override
+            public void onError(String error) {
+                // Ignore
+            }
+        });
     }
 
     private void loadData() {
@@ -38,9 +98,22 @@ public class HomeFragment extends Fragment {
         DataRepository.getInstance().refreshMovies(new DataRepository.DataCallback() {
             @Override
             public void onDataLoaded() {
-                if (getActivity() != null) {
-                    updateUI();
-                }
+                // Initial load of recommendations
+                DataRepository.getInstance().loadRecommendations(new DataRepository.DataCallback() {
+                    @Override
+                    public void onDataLoaded() {
+                        if (getActivity() != null) {
+                            updateUI();
+                        }
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        if (getActivity() != null) {
+                            updateUI(); // Update anyway
+                        }
+                    }
+                });
             }
 
             @Override
@@ -57,6 +130,12 @@ public class HomeFragment extends Fragment {
         DataRepository repo = DataRepository.getInstance();
         
         // Only add categories if they have items
+        List<Movie> continueWatching = repo.getContinueWatchingMovies();
+        if (!continueWatching.isEmpty()) categoryList.add(new Category("Continue Watching", continueWatching));
+
+        List<Movie> recommendations = repo.getRecommendedMovies();
+        if (!recommendations.isEmpty()) categoryList.add(new Category("Recomendaciones", recommendations));
+
         List<Movie> movies = repo.getMovies();
         if (!movies.isEmpty()) categoryList.add(new Category("Movies", movies));
         

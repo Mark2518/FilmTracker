@@ -16,13 +16,32 @@
         android:textColor="#FFFFFF"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:drawableStart="@android:drawable/ic_menu_search"
-        android:drawablePadding="8dp" />
+        android:imeOptions="actionSearch"
+        android:inputType="text" />
+
+    <ProgressBar
+        android:id="@+id/search_loading_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/search_recycler_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:layout_marginTop="16dp" />
+
+    <Button
+        android:id="@+id/btn_load_more_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Load More Results"
+        android:backgroundTint="#445566"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="8dp"
+        android:visibility="gone" />
 
 </LinearLayout>

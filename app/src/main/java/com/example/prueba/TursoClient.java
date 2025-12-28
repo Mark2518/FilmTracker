@@ -21,8 +21,8 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class TursoClient {
-    private static final String TURSO_URL = "https://movies-mark2518.aws-eu-west-1.turso.io/v2/pipeline";
-    private static final String TURSO_TOKEN = "Bearer eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NjY5MTc3NjEsImlkIjoiZDk2N2Q1NWMtZGYzMS00NDY2LTg1MzQtYmMzODcwM2EwZmY2IiwicmlkIjoiY2Y0MTEzZGMtMjAwNy00NjEzLWE1OTYtOGVmNTc4YTM3YTI5In0.Mg20cMcLivDLBMdp_TOumRDaD6avEUA4vBKMLhv7Bw8Rw1bWHYGk6a3gfHmrmMiq_2ih6MnGCMlYrCHlB5fYAg";
+    private static final String TURSO_URL = BuildConfig.TURSO_URL + "/v2/pipeline";
+    private static final String TURSO_TOKEN = "Bearer " + BuildConfig.TURSO_TOKEN;
 
     private final OkHttpClient client;
     private final Gson gson;
@@ -30,7 +30,11 @@ public class TursoClient {
     private final Handler mainHandler;
 
     public TursoClient() {
-        this.client = new OkHttpClient();
+        this.client = new OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build();
         this.gson = new Gson();
         this.executor = Executors.newSingleThreadExecutor();
         this.mainHandler = new Handler(Looper.getMainLooper());
@@ -41,14 +45,70 @@ public class TursoClient {
         void onError(Exception e);
     }
 
-    public void fetchMovies(MovieCallback callback) {
+    public void fetchMovies(int limit, int offset, MovieCallback callback) {
+        String sql = "SELECT * FROM movies LIMIT " + limit + " OFFSET " + offset;
+        executeSql(sql, callback);
+    }
+
+    public void searchMovies(String query, int limit, int offset, MovieCallback callback) {
+        // Basic sanitization
+        String safeQuery = query.replace("'", "''");
+        String sql = "SELECT * FROM movies WHERE title LIKE '%" + safeQuery + "%' LIMIT " + limit + " OFFSET " + offset;
+        executeSql(sql, callback);
+    }
+
+    public void fetchRandomMovies(MovieCallback callback) {
+        String sql = "SELECT * FROM movies ORDER BY RANDOM() LIMIT 20";
+        executeSql(sql, callback);
+    }
+
+    public void fetchRecommendations(List<String> genres, List<String> titleKeywords, MovieCallback callback) {
+        if ((genres == null || genres.isEmpty()) && (titleKeywords == null || titleKeywords.isEmpty())) {
+            fetchRandomMovies(callback);
+            return;
+        }
+        
+        // Take top 3 of each to avoid huge query
+        List<String> topGenres = (genres != null && genres.size() > 3) ? genres.subList(0, 3) : (genres != null ? genres : new ArrayList<>());
+        List<String> topKeywords = (titleKeywords != null && titleKeywords.size() > 3) ? titleKeywords.subList(0, 3) : (titleKeywords != null ? titleKeywords : new ArrayList<>());
+
+        StringBuilder sb = new StringBuilder("SELECT * FROM movies WHERE ");
+        boolean hasConditions = false;
+
+        if (!topGenres.isEmpty()) {
+            sb.append("(");
+            for (int i = 0; i < topGenres.size(); i++) {
+                String g = topGenres.get(i).replace("'", "''").trim();
+                sb.append("genre LIKE '%").append(g).append("%'");
+                if (i < topGenres.size() - 1) {
+                    sb.append(" OR ");
+                }
+            }
+            sb.append(")");
+            hasConditions = true;
+        }
+
+        if (!topKeywords.isEmpty()) {
+            if (hasConditions) sb.append(" OR ");
+            sb.append("(");
+            for (int i = 0; i < topKeywords.size(); i++) {
+                String k = topKeywords.get(i).replace("'", "''").trim();
+                sb.append("title LIKE '%").append(k).append("%'");
+                if (i < topKeywords.size() - 1) {
+                    sb.append(" OR ");
+                }
+            }
+            sb.append(")");
+        }
+
+        sb.append(" ORDER BY RANDOM() LIMIT 20");
+        executeSql(sb.toString(), callback);
+    }
+
+    private void executeSql(String sql, MovieCallback callback) {
         executor.execute(() -> {
             try {
-                // SQL to execute
-                String sql = "SELECT * FROM movies";
-                
                 // Construct JSON Body for Turso
-                // { "requests": [ { "type": "execute", "stmt": { "sql": "SELECT * FROM movies" } } ] }
                 JsonObject stmt = new JsonObject();
                 stmt.addProperty("sql", sql);
                 
@@ -82,7 +142,7 @@ public class TursoClient {
                     mainHandler.post(() -> callback.onSuccess(movies));
                 }
             } catch (Exception e) {
-                Log.e("TursoClient", "Error fetching movies", e);
+                Log.e("TursoClient", "Error executing SQL: " + sql, e);
                 mainHandler.post(() -> callback.onError(e));
             }
         });
@@ -111,18 +171,14 @@ public class TursoClient {
                     return movies;
                 }
                 
-                JsonArray resultRows = responseObj.getAsJsonArray("result").get(0).getAsJsonObject().getAsJsonArray("rows"); 
-                // Wait, structure can be tricky.
-                // Standard LibSQL HTTP:
-                // { "results": [ { "type": "ok", "response": { "result": { "cols": [...], "rows": [ [val1, val2], ... ], ... } } } ] }
-                // Let's protect against NPEs
-                
+                // Correctly extracting the result object
+
                 JsonObject innerResult = responseObj.getAsJsonObject("result");
                 JsonArray cols = innerResult.getAsJsonArray("cols");
                 JsonArray rows = innerResult.getAsJsonArray("rows");
 
                 // Map column names to indices
-                int colId = -1, colTitle = -1, colRuntime = -1, colOverview = -1, colPoster = -1, colBackdrop = -1, colRating = -1, colYear = -1, colDirector = -1, colCast = -1, colIsSeries = -1;
+                int colId = -1, colTitle = -1, colRuntime = -1, colOverview = -1, colPoster = -1, colBackdrop = -1, colRating = -1, colYear = -1, colDirector = -1, colCast = -1, colIsSeries = -1, colGenre = -1;
                 
                 for (int i = 0; i < cols.size(); i++) {
                     JsonObject col = cols.get(i).getAsJsonObject();
@@ -139,6 +195,8 @@ public class TursoClient {
                         case "director": colDirector = i; break;
                         case "cast": colCast = i; break;
                         case "is_series": colIsSeries = i; break;
+                        case "genre": 
+                        case "genres": colGenre = i; break;
                     }
                 }
 
@@ -153,6 +211,13 @@ public class TursoClient {
                         int runtime = getInt(row, colRuntime);
                         String overview = getString(row, colOverview);
                         String posterPath = getString(row, colPoster);
+                        String genreStr = getString(row, colGenre);
+                        List<String> genreList = new ArrayList<>();
+                        if (genreStr != null && !genreStr.isEmpty()) {
+                            for (String g : genreStr.split(",")) {
+                                genreList.add(g.trim());
+                            }
+                        }
                         
                         // Construct URLs
                         String fullPosterUrl = posterPath.startsWith("http") ? posterPath : "https://image.tmdb.org/t/p/w500" + posterPath;
@@ -174,6 +239,7 @@ public class TursoClient {
                             "", // Director
                             durationStr,
                             "", // Cast
+                            genreList, // Genre List
                             false // isSeries check if column exists
                         );
                         movies.add(m);

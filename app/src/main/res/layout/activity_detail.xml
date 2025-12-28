@@ -64,19 +64,18 @@
             app:layout_constraintStart_toStartOf="@id/detail_title"
             app:layout_constraintTop_toBottomOf="@id/detail_title" />
 
-        <RatingBar
-            android:id="@+id/detail_rating"
-            style="?android:attr/ratingBarStyleSmall"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/detail_genre"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:numStars="5"
-            android:stepSize="0.5"
-            android:theme="@style/Widget.AppCompat.RatingBar"
-            android:progressTint="#00E054"
-            android:secondaryProgressTint="#00E054"
+            android:layout_marginTop="4dp"
+            android:textColor="#CCCCCC"
+            android:textSize="14sp"
+            android:textStyle="italic"
+            app:layout_constraintEnd_toEndOf="@id/detail_title"
             app:layout_constraintStart_toStartOf="@id/detail_title"
             app:layout_constraintTop_toBottomOf="@id/detail_year_director" />
+
 
         <LinearLayout
             android:id="@+id/action_buttons"
@@ -86,7 +85,7 @@
             android:layout_marginTop="16dp"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
-            app:layout_constraintTop_toBottomOf="@id/detail_rating"
+            app:layout_constraintTop_toBottomOf="@id/detail_genre"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 
@@ -111,6 +110,40 @@
                 android:textColor="#FFFFFF" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/resume_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:gravity="center_vertical"
+            app:layout_constraintTop_toBottomOf="@id/action_buttons"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <EditText
+                android:id="@+id/edit_resume_minute"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Resume at (min)"
+                android:inputType="number"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#99AABB"
+                android:backgroundTint="#445566" />
+
+            <Button
+                android:id="@+id/btn_save_progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Save"
+                android:backgroundTint="#445566"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/detail_description"
             android:layout_width="0dp"
@@ -122,31 +155,8 @@
             android:textSize="16sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="@id/poster_card"
-            app:layout_constraintTop_toBottomOf="@id/action_buttons" />
+            app:layout_constraintTop_toBottomOf="@id/resume_container" />
 
-        <TextView
-            android:id="@+id/label_cast"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="CAST &amp; CREW"
-            android:textColor="#99AABB"
-            android:textSize="12sp"
-            android:letterSpacing="0.1"
-            app:layout_constraintStart_toStartOf="@id/detail_description"
-            app:layout_constraintTop_toBottomOf="@id/detail_description" />
-
-        <TextView
-            android:id="@+id/detail_cast"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="@id/label_cast"
-            app:layout_constraintTop_toBottomOf="@id/label_cast" />
 
 
 

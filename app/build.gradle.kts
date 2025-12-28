@@ -4,8 +4,11 @@ plugins {
 
 android {
     namespace = "com.example.prueba"
-    compileSdk {
-        version = release(36)
+    compileSdk = 36
+
+
+    buildFeatures {
+        buildConfig = true
     }
 
     defaultConfig {
@@ -16,6 +19,20 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        val envFile = rootProject.file(".env")
+        if (envFile.exists()) {
+            envFile.forEachLine { line ->
+                val parts = line.split("=", limit = 2)
+                if (parts.size == 2) {
+                    val key = parts[0].trim()
+                    val value = parts[1].trim().removeSurrounding("\"")
+                    if (key == "TURSO_URL" || key == "TURSO_TOKEN") {
+                         buildConfigField("String", key, "\"$value\"")
+                    }
+                }
+            }
+        }
     }
 
     buildTypes {

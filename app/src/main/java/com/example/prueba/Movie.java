@@ -12,6 +12,7 @@ public class Movie implements Serializable {
     private String director;
     private String duration;
     private String cast;
+    private java.util.List<String> genres;
 
 
     private long id;
@@ -19,7 +20,7 @@ public class Movie implements Serializable {
     private boolean isWatched;
     private boolean isInWatchlist;
 
-    public Movie(long id, String title, String posterUrl, String backdropUrl, float rating, String description, String year, String director, String duration, String cast, boolean isSeries) {
+    public Movie(long id, String title, String posterUrl, String backdropUrl, float rating, String description, String year, String director, String duration, String cast, java.util.List<String> genres, boolean isSeries) {
         this.id = id;
         this.title = title;
         this.posterUrl = posterUrl;
@@ -30,6 +31,7 @@ public class Movie implements Serializable {
         this.director = director;
         this.duration = duration;
         this.cast = cast;
+        this.genres = genres;
         this.isSeries = isSeries;
         this.isWatched = false;
         this.isInWatchlist = false;
@@ -38,7 +40,7 @@ public class Movie implements Serializable {
     // Constructor for backward compatibility (defaults to Movie, random ID if needed but better to enforce ID)
     // We will use hash of title if no ID provided in legacy calls, or 0.
     public Movie(String title, String posterUrl, String backdropUrl, float rating, String description, String year, String director, String duration, String cast) {
-        this(title.hashCode(), title, posterUrl, backdropUrl, rating, description, year, director, duration, cast, false);
+        this(title.hashCode(), title, posterUrl, backdropUrl, rating, description, year, director, duration, cast, new java.util.ArrayList<>(), false);
     }
 
     public long getId() { return id; }
@@ -51,6 +53,7 @@ public class Movie implements Serializable {
     public String getDirector() { return director; }
     public String getDuration() { return duration; }
     public String getCast() { return cast; }
+    public java.util.List<String> getGenres() { return genres; }
     
     public boolean isSeries() { return isSeries; }
     public boolean isWatched() { return isWatched; }

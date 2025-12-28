@@ -105,6 +105,7 @@ public class MovieDatabaseHelper extends SQLiteOpenHelper {
                         "", // Director default
                         durationStr,
                         "", // Cast default
+                        new ArrayList<>(), // Genres default
                         false // isSeries default
                 );
                 movies.add(movie);
