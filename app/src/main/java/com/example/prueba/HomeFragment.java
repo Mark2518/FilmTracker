@@ -18,30 +18,63 @@ public class HomeFragment extends Fragment {
     private CategoryAdapter adapter;
     private List<Category> categoryList;
 
-    @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_home, container, false);
         recyclerView = view.findViewById(R.id.home_recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         
-        loadDummyData();
-        
+        categoryList = new ArrayList<>();
         adapter = new CategoryAdapter(getContext(), categoryList);
         recyclerView.setAdapter(adapter);
+
+        loadData();
         
         return view;
     }
 
-    private void loadDummyData() {
-        categoryList = new ArrayList<>();
+    private void loadData() {
+        android.widget.Toast.makeText(getContext(), "Loading movies...", android.widget.Toast.LENGTH_SHORT).show();
+        DataRepository.getInstance().refreshMovies(new DataRepository.DataCallback() {
+            @Override
+            public void onDataLoaded() {
+                if (getActivity() != null) {
+                    updateUI();
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                if (getActivity() != null) {
+                    android.widget.Toast.makeText(getContext(), "Error: " + error, android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+    private void updateUI() {
+        categoryList.clear();
         DataRepository repo = DataRepository.getInstance();
         
-        categoryList.add(new Category("Movies", repo.getMovies()));
-        categoryList.add(new Category("Series", repo.getSeries()));
-        categoryList.add(new Category("Action & Adventure", repo.getActionMovies()));
-        categoryList.add(new Category("Sci-Fi & Future", repo.getSciFiMovies()));
-        categoryList.add(new Category("Crime & Drama", repo.getCrimeMovies()));
-        categoryList.add(new Category("All Content", repo.getAllMovies()));
+        // Only add categories if they have items
+        List<Movie> movies = repo.getMovies();
+        if (!movies.isEmpty()) categoryList.add(new Category("Movies", movies));
+        
+        List<Movie> series = repo.getSeries();
+        if (!series.isEmpty()) categoryList.add(new Category("Series", series));
+        
+        List<Movie> action = repo.getActionMovies();
+        if (!action.isEmpty()) categoryList.add(new Category("Action & Adventure", action));
+        
+        List<Movie> scifi = repo.getSciFiMovies();
+        if (!scifi.isEmpty()) categoryList.add(new Category("Sci-Fi & Future", scifi));
+        
+        List<Movie> crime = repo.getCrimeMovies();
+        if (!crime.isEmpty()) categoryList.add(new Category("Crime & Drama", crime));
+        
+        List<Movie> all = repo.getAllMovies();
+        if (!all.isEmpty()) categoryList.add(new Category("All Content", all));
+
+        adapter.notifyDataSetChanged();
     }
 }

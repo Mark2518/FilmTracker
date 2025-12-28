@@ -6,10 +6,13 @@ import java.util.List;
 public class DataRepository {
     private static DataRepository instance;
     private User currentUser;
-    private MovieDatabaseHelper dbHelper;
+    private List<Movie> cachedMovies;
+    private TursoClient tursoClient;
 
     private DataRepository() {
         currentUser = new User("Guest User");
+        cachedMovies = new ArrayList<>();
+        tursoClient = new TursoClient();
     }
 
     public static synchronized DataRepository getInstance() {
@@ -20,9 +23,28 @@ public class DataRepository {
     }
 
     public void init(android.content.Context context) {
-         if (dbHelper == null) {
-             dbHelper = new MovieDatabaseHelper(context);
-         }
+        // Context not strictly needed for Turso HTTP client unless using ConnectivityManager
+    }
+    
+    public interface DataCallback {
+        void onDataLoaded();
+        void onError(String error);
+    }
+
+    public void refreshMovies(DataCallback callback) {
+        tursoClient.fetchMovies(new TursoClient.MovieCallback() {
+            @Override
+            public void onSuccess(List<Movie> movies) {
+                cachedMovies.clear();
+                cachedMovies.addAll(movies);
+                if (callback != null) callback.onDataLoaded();
+            }
+
+            @Override
+            public void onError(Exception e) {
+                if (callback != null) callback.onError(e.getMessage());
+            }
+        });
     }
 
     public User getCurrentUser() {
@@ -30,15 +52,12 @@ public class DataRepository {
     }
 
     public List<Movie> getAllMovies() {
-        if (dbHelper != null) {
-            return dbHelper.getAllMovies();
-        }
-        return new ArrayList<>();
+        return new ArrayList<>(cachedMovies);
     }
 
     public List<Movie> getMovies() {
         List<Movie> movies = new ArrayList<>();
-        for (Movie m : getAllMovies()) {
+        for (Movie m : cachedMovies) {
             if (!m.isSeries()) movies.add(m);
         }
         return movies;
@@ -46,21 +65,17 @@ public class DataRepository {
 
     public List<Movie> getSeries() {
         List<Movie> series = new ArrayList<>();
-        for (Movie m : getAllMovies()) {
+        for (Movie m : cachedMovies) {
             if (m.isSeries()) series.add(m);
         }
         return series;
     }
 
     public List<Movie> getActionMovies() {
-        // Simple filter simulation
         List<Movie> action = new ArrayList<>();
-        for (Movie m : getAllMovies()) {
+        for (Movie m : cachedMovies) {
             if (m.getDescription().toLowerCase().contains("action") || 
-                m.getDescription().toLowerCase().contains("fight") ||
-                m.getDescription().toLowerCase().contains("war") ||
-                m.getTitle().equals("The Dark Knight") ||
-                m.getTitle().equals("Inception")) {
+                m.getDescription().toLowerCase().contains("fight")) {
                 action.add(m);
             }
         }
@@ -69,11 +84,9 @@ public class DataRepository {
 
     public List<Movie> getSciFiMovies() {
         List<Movie> scifi = new ArrayList<>();
-        for (Movie m : getAllMovies()) {
+        for (Movie m : cachedMovies) {
             if (m.getDescription().toLowerCase().contains("space") || 
-                m.getDescription().toLowerCase().contains("future") ||
-                m.getDescription().toLowerCase().contains("technology") ||
-                m.getTitle().equals("The Matrix")) {
+                m.getDescription().toLowerCase().contains("future")) {
                 scifi.add(m);
             }
         }
@@ -82,11 +95,9 @@ public class DataRepository {
 
     public List<Movie> getCrimeMovies() {
         List<Movie> crime = new ArrayList<>();
-        for (Movie m : getAllMovies()) {
+        for (Movie m : cachedMovies) {
             if (m.getDescription().toLowerCase().contains("crime") || 
-                m.getDescription().toLowerCase().contains("mob") ||
-                m.getDescription().toLowerCase().contains("gangster") ||
-                m.getTitle().equals("Pulp Fiction")) {
+                m.getDescription().toLowerCase().contains("mob")) {
                 crime.add(m);
             }
         }
@@ -95,7 +106,7 @@ public class DataRepository {
 
     public List<Movie> search(String query) {
         List<Movie> results = new ArrayList<>();
-        for (Movie m : getAllMovies()) {
+        for (Movie m : cachedMovies) {
             if (m.getTitle().toLowerCase().contains(query.toLowerCase())) {
                 results.add(m);
             }
