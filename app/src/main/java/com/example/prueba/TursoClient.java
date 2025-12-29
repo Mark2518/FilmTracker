@@ -12,7 +12,7 @@ import java.util.Set;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale; // IMPORTANTE
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import okhttp3.MediaType;
@@ -44,27 +44,18 @@ public class TursoClient {
         void onError(Exception e);
     }
 
-    // --- NUEVO: SELECCIÓN DINÁMICA DE COLUMNAS ---
+    // --- SELECCIÓN INTELIGENTE DE IDIOMA ---
     private String getColumns() {
         String lang = Locale.getDefault().getLanguage();
-
-        // Basado en tu imagen de la base de datos:
-        // Tienes 'overview' (inglés) y 'overview_es' (español).
-        // NO TIENES 'title_es' en la imagen, así que el título se queda igual.
-
         if (lang.equals("es")) {
-            // Truco SQL: COALESCE usa el español, y si está vacío, usa el inglés.
-            // "AS overview" engaña a Java para que crea que es la columna normal.
-            return "rowid, title, runtime, COALESCE(overview_es, overview) as overview, poster_path, genres";
+
+            return "rowid, title, runtime, overview_es as overview, poster_path, genres";
         } else {
             return "rowid, title, runtime, overview, poster_path, genres";
         }
     }
 
-    // --- MÉTODOS DE BÚSQUEDA ACTUALIZADOS ---
-
     public void fetchMovies(int limit, int offset, MovieCallback callback) {
-        // Usamos getColumns() en lugar de *
         String sql = "SELECT " + getColumns() + " FROM peliculas LIMIT " + limit + " OFFSET " + offset;
         executeSql(sql, callback);
     }
@@ -86,17 +77,16 @@ public class TursoClient {
             mainHandler.post(() -> callback.onSuccess(new LinkedHashSet<>()));
             return;
         }
-
         String[] terms = safeQuery.split("\\s+");
         StringBuilder sqlBuilder = new StringBuilder();
 
-        // Inyectamos las columnas correctas aquí también
         sqlBuilder.append("SELECT ").append(getColumns()).append(" FROM peliculas WHERE ");
 
         for (int i = 0; i < terms.length; i++) {
             if (i > 0) sqlBuilder.append(" AND ");
             String termClean = terms[i].toLowerCase().replace("-", "").replace(":", "");
             sqlBuilder.append("(LOWER(REPLACE(REPLACE(title, '-', ''), ' ', '')) LIKE '%")
+                    .append(termClean).append("%' OR LOWER(REPLACE(REPLACE(title_es, '-', ''), ' ', '')) LIKE '%")
                     .append(termClean).append("%')");
         }
         sqlBuilder.append(" LIMIT ").append(limit).append(" OFFSET ").append(offset);
@@ -109,7 +99,6 @@ public class TursoClient {
             return;
         }
         List<String> topGenres = (genres.size() > 3) ? genres.subList(0, 3) : genres;
-
         StringBuilder sb = new StringBuilder("SELECT " + getColumns() + " FROM peliculas WHERE ");
         sb.append("(");
         for (int i = 0; i < topGenres.size(); i++) {
@@ -121,7 +110,7 @@ public class TursoClient {
         executeSql(sb.toString(), callback);
     }
 
-    // --- PARSEO (Sin cambios, pero ahora recibirá los datos correctos) ---
+
     private void executeSql(String sql, MovieCallback callback) {
         executor.execute(() -> {
             try {
@@ -159,7 +148,6 @@ public class TursoClient {
             if (results.size() > 0) {
                 JsonObject resultItem = results.get(0).getAsJsonObject();
                 if (resultItem.has("error")) return movies;
-
                 JsonObject responseObj = resultItem.getAsJsonObject("response");
                 if (responseObj == null) return movies;
                 JsonObject innerResult = responseObj.getAsJsonObject("result");
@@ -187,29 +175,23 @@ public class TursoClient {
                         int runtime = getInt(row, colRuntime);
                         String overview = getString(row, colOverview);
                         String rawPoster = getString(row, colPoster);
-
                         String genreStr = getString(row, colGenre);
                         List<String> genreList = new ArrayList<>();
                         if (!genreStr.isEmpty()) {
                             String cleanGenres = genreStr.replace("[", "").replace("]", "").replace("'", "");
                             for (String g : cleanGenres.split(",")) genreList.add(g.trim());
                         }
-
                         int hours = runtime / 60;
                         int minutes = runtime % 60;
                         String durationStr = (hours > 0 ? hours + "h " : "") + minutes + "m";
 
                         movies.add(new Movie(id, title, rawPoster, overview, durationStr, genreList));
-
-                    } catch (Exception e) {
-                        Log.e("TursoParsing", "Skip row", e);
-                    }
+                    } catch (Exception e) { Log.e("TursoParsing", "Skip row", e); }
                 }
             }
         } catch (Exception e) { Log.e("TursoParsing", "Error JSON", e); }
         return movies;
     }
-
     private String getString(JsonArray row, int index) {
         if (index == -1 || index >= row.size() || row.get(index).isJsonNull()) return "";
         JsonElement el = row.get(index);

@@ -9,7 +9,6 @@ import android.util.DisplayMetrics;
 import android.widget.Button;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
-import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.Locale;
 
@@ -31,7 +30,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         // 1. Cargar el estado actual
         SharedPreferences prefs = getSharedPreferences("Settings", MODE_PRIVATE);
-        String currentLang = prefs.getString("My_Lang", "en"); // Inglés por defecto
+        String currentLang = prefs.getString("My_Lang", "en");
 
         if (currentLang.equals("es")) {
             radioEs.setChecked(true);
@@ -39,40 +38,34 @@ public class SettingsActivity extends AppCompatActivity {
             radioEn.setChecked(true);
         }
 
-        // 2. Escuchar el botón de aplicar
         btnApply.setOnClickListener(v -> {
-            String selectedLang = "en";
-            if (radioEs.isChecked()) {
-                selectedLang = "es";
-            }
-
-            // Si el idioma es diferente al actual, lo cambiamos
-            if (!selectedLang.equals(currentLang)) {
-                setLocale(selectedLang);
-            } else {
-                finish(); // Simplemente cerrar si no hubo cambios
-            }
+            String selectedLang = radioEs.isChecked() ? "es" : "en";
+            // Siempre aplicamos para asegurar la recarga
+            setLocale(selectedLang);
         });
     }
 
     private void setLocale(String lang) {
-        // A. Guardar en preferencias para el futuro
+        // A. Guardar preferencia
         SharedPreferences prefs = getSharedPreferences("Settings", MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("My_Lang", lang);
         editor.apply();
 
-        // B. Cambiar la configuración del sistema para la app
+        // B. Cambiar Locale del sistema
         Locale myLocale = new Locale(lang);
+        Locale.setDefault(myLocale);
         Resources res = getResources();
         DisplayMetrics dm = res.getDisplayMetrics();
         Configuration conf = res.getConfiguration();
         conf.setLocale(myLocale);
         res.updateConfiguration(conf, dm);
 
-        // C. Reiniciar la APP completa para que los cambios surtan efecto en todas partes
+        // C. IMPORTANTE: Borrar caché para que se descarguen las traducciones
+        DataRepository.getInstance().clearCache();
+
+        // D. Reiniciar la APP completa
         Intent refresh = new Intent(this, MainActivity.class);
-        // Estas flags borran todas las actividades anteriores y empiezan de nuevo
         refresh.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(refresh);
         finish();
