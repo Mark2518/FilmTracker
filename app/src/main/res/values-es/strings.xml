@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Prueba</string>
-    <string name="button_watchlist">Lista</string>
+    <string name="button_watchlist">Por Ver</string>
     <string name="button_in_watchlist">En Lista</string>
     <string name="button_seen">Visto</string>
     <string name="button_in_seen">Visto</string>
