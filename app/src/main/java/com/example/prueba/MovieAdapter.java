@@ -23,10 +23,17 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
         this.movieList = new ArrayList<>(movieSet);
     }
 
+    // Actualiza la lista completa (para nueva búsqueda)
     public void updateMovies(Set<Movie> newMovies) {
         this.movieList.clear();
         this.movieList.addAll(newMovies);
         notifyDataSetChanged();
+    }
+
+    public void addMovies(Set<Movie> moreMovies) {
+        int startPos = this.movieList.size();
+        this.movieList.addAll(moreMovies);
+        notifyItemRangeInserted(startPos, moreMovies.size());
     }
 
     @NonNull
@@ -39,9 +46,9 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     @Override
     public void onBindViewHolder(@NonNull MovieViewHolder holder, int position) {
         Movie movie = movieList.get(position);
-        
+
         if (movie.isLoading()) {
-             holder.poster.setImageResource(android.R.drawable.ic_menu_help);
+            holder.poster.setImageResource(android.R.drawable.ic_menu_help);
         } else {
             Glide.with(context)
                     .load(movie.getPosterUrl())

@@ -85,7 +85,6 @@ public class TursoClient {
             if (i > 0) sqlBuilder.append(" AND ");
             String termClean = terms[i].toLowerCase().replace("-", "").replace(":", "");
             sqlBuilder.append("(LOWER(REPLACE(REPLACE(title, '-', ''), ' ', '')) LIKE '%")
-                    .append(termClean).append("%' OR LOWER(REPLACE(REPLACE(title_es, '-', ''), ' ', '')) LIKE '%")
                     .append(termClean).append("%')");
         }
         sqlBuilder.append(" LIMIT ").append(limit).append(" OFFSET ").append(offset);
