@@ -23,13 +23,11 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
         this.movieList = new ArrayList<>(movieSet);
     }
 
-    // --- NUEVO MÉTODO: Esto es lo que faltaba ---
     public void updateMovies(Set<Movie> newMovies) {
         this.movieList.clear();
         this.movieList.addAll(newMovies);
         notifyDataSetChanged();
     }
-    // ---------------------------------------------
 
     @NonNull
     @Override
@@ -42,10 +40,8 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.MovieViewHol
     public void onBindViewHolder(@NonNull MovieViewHolder holder, int position) {
         Movie movie = movieList.get(position);
         
-        // Cargar imagen o un placeholder si está cargando
         if (movie.isLoading()) {
-             // Aquí podrías poner una imagen de loading específica
-             holder.poster.setImageResource(android.R.drawable.ic_menu_help); 
+             holder.poster.setImageResource(android.R.drawable.ic_menu_help);
         } else {
             Glide.with(context)
                     .load(movie.getPosterUrl())

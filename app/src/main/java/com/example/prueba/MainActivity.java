@@ -13,25 +13,22 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 1. CARGAMOS EL IDIOMA GUARDADO ANTES DE CREAR LA VISTA
+        //CARGAR EL IDIOMA GUARDADO ANTES DE CREAR LA VISTA
         loadLocale();
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Tu código original de inicialización
         DataRepository.getInstance().init(this);
 
         com.google.android.material.bottomnavigation.BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
 
-        // Cargar fragmento por defecto
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, new HomeFragment())
                     .commit();
         }
 
-        // Tu lógica de navegación original
         bottomNav.setOnItemSelectedListener(item -> {
             androidx.fragment.app.Fragment selectedFragment = null;
             int itemId = item.getItemId();
@@ -41,7 +38,6 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_search) {
                 selectedFragment = new SearchFragment();
             } else if (itemId == R.id.nav_profile) {
-                // Asumo que tienes un ProfileFragment, si no, comenta esta línea
                 selectedFragment = new ProfileFragment();
             }
 
@@ -67,7 +63,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // --- NUEVO: MOSTRAR EL ENGRANAJE DE AJUSTES ARRIBA ---
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuItem settingsItem = menu.add(Menu.NONE, 1, Menu.NONE, "Ajustes");
@@ -76,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    // --- NUEVO: ABRIR LA ACTIVIDAD DE AJUSTES ---
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == 1) {

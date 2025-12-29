@@ -1,25 +1,38 @@
 package com.example.prueba;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
 public class MovieDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "movies.db";
-    private static final int DATABASE_VERSION = 3; // Subimos versión para limpiar tablas viejas
+    private static final int DATABASE_VERSION = 4;
 
     public static final String TABLE_MOVIES = "movies";
     public static final String COLUMN_ID = "id";
     public static final String COLUMN_TITLE = "title";
-    public static final String COLUMN_TITLE_ES = "title_es";
     public static final String COLUMN_RUNTIME = "runtime";
     public static final String COLUMN_OVERVIEW = "overview";
     public static final String COLUMN_POSTER_PATH = "poster_path";
     public static final String COLUMN_GENRES = "genres";
+
+    // --- NUEVAS TABLAS DE USUARIO ---
+    private static final String TABLE_WATCHLIST = "watchlist";
+    private static final String TABLE_SEEN = "seen";
+    private static final String TABLE_RESUME = "resume";
+
+    private static final String COL_MOVIE_ID = "movie_id";
+    private static final String COL_TIMESTAMP = "timestamp";
+    private static final String COL_POSITION = "position";
 
     public MovieDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -27,54 +40,88 @@ public class MovieDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String CREATE_MOVIES_TABLE = "CREATE TABLE " + TABLE_MOVIES + "("
-                + COLUMN_ID + " INTEGER PRIMARY KEY,"
-                + COLUMN_TITLE + " TEXT,"
-                + COLUMN_RUNTIME + " INTEGER,"
-                + COLUMN_OVERVIEW + " TEXT,"
-                + COLUMN_POSTER_PATH + " TEXT,"
-                + COLUMN_GENRES + " TEXT"
-                + ")";
-        db.execSQL(CREATE_MOVIES_TABLE);
+            //No hace falta
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_MOVIES);
-        onCreate(db);
+        //No hace falta
     }
 
-    public List<Movie> getAllMovies() {
-        List<Movie> movies = new ArrayList<>();
-        SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.query(TABLE_MOVIES, null, null, null, null, null, null);
+    public void addToWatchlist(long movieId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COL_MOVIE_ID, movieId);
+        values.put(COL_TIMESTAMP, System.currentTimeMillis());
+        db.insertWithOnConflict(TABLE_WATCHLIST, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
 
+    public void removeFromWatchlist(long movieId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete(TABLE_WATCHLIST, COL_MOVIE_ID + " = ?", new String[]{String.valueOf(movieId)});
+    }
+
+    public Set<Long> getWatchlistIds() {
+        Set<Long> ids = new HashSet<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT " + COL_MOVIE_ID + " FROM " + TABLE_WATCHLIST, null);
         if (cursor.moveToFirst()) {
             do {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID));
-                String title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE));
-                String title_es = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE_ES));
-                int runtime = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_RUNTIME));
-                String overview = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_OVERVIEW));
-                String posterUrl = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_POSTER_PATH));
-                String genresStr = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_GENRES));
-
-                // Conversión de minutos a "1h 30m"
-                int hours = runtime / 60;
-                int minutes = runtime % 60;
-                String durationStr = (hours > 0 ? hours + "h " : "") + minutes + "m";
-
-                List<String> genreList = new ArrayList<>();
-                if (genresStr != null && !genresStr.isEmpty()) {
-                    for (String g : genresStr.split(",")) genreList.add(g.trim());
-                }
-
-                // Usamos el constructor limpio
-                movies.add(new Movie(id, title, posterUrl, overview, durationStr, genreList));
-
+                ids.add(cursor.getLong(0));
             } while (cursor.moveToNext());
         }
         cursor.close();
-        return movies;
+        return ids;
     }
+
+
+    public void addToSeen(long movieId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COL_MOVIE_ID, movieId);
+        values.put(COL_TIMESTAMP, System.currentTimeMillis());
+        db.insertWithOnConflict(TABLE_SEEN, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public void removeFromSeen(long movieId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete(TABLE_SEEN, COL_MOVIE_ID + " = ?", new String[]{String.valueOf(movieId)});
+    }
+
+    public Set<Long> getSeenIds() {
+        Set<Long> ids = new HashSet<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT " + COL_MOVIE_ID + " FROM " + TABLE_SEEN, null);
+        if (cursor.moveToFirst()) {
+            do {
+                ids.add(cursor.getLong(0));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return ids;
+    }
+
+
+    public void saveProgress(long movieId, int position) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COL_MOVIE_ID, movieId);
+        values.put(COL_POSITION, position);
+        db.insertWithOnConflict(TABLE_RESUME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public Map<Long, Integer> getResumePositions() {
+        Map<Long, Integer> map = new HashMap<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT " + COL_MOVIE_ID + ", " + COL_POSITION + " FROM " + TABLE_RESUME, null);
+        if (cursor.moveToFirst()) {
+            do {
+                map.put(cursor.getLong(0), cursor.getInt(1));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return map;
+    }
+
+
 }

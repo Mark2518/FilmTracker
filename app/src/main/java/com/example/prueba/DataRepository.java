@@ -1,15 +1,25 @@
 package com.example.prueba;
 
+import android.content.Context;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 
 public class DataRepository {
     private static DataRepository instance;
     private User currentUser;
     private Set<Movie> cachedMovies;
     private TursoClient tursoClient;
+
+    // Referencia a la Base de Datos Local
+    private MovieDatabaseHelper dbHelper;
+
+    // Caché en memoria de los IDs guardados (para acceso rápido)
+    private Set<Long> localWatchlistIds;
+    private Set<Long> localSeenIds;
+    private Map<Long, Integer> localResumeMap;
 
     public void cacheMovie(Movie movie) {
         if (!cachedMovies.contains(movie)) {
@@ -18,7 +28,7 @@ public class DataRepository {
     }
 
     private DataRepository() {
-        currentUser = new User("Guest User");
+        currentUser = new User();
         cachedMovies = new LinkedHashSet<>();
         tursoClient = new TursoClient();
     }
@@ -30,15 +40,89 @@ public class DataRepository {
         return instance;
     }
 
+    // --- NUEVO: Inicialización de BD ---
+    public void init(Context context) {
+        dbHelper = new MovieDatabaseHelper(context);
+        // Cargamos lo que hay guardado en el móvil
+        localWatchlistIds = dbHelper.getWatchlistIds();
+        localSeenIds = dbHelper.getSeenIds();
+        localResumeMap = dbHelper.getResumePositions();
+    }
 
     public void clearCache() {
         if (cachedMovies != null) {
             cachedMovies.clear();
         }
     }
-    // -------------------------------
 
-    public void init(android.content.Context context) { }
+    // --- MÉTODOS DE PERSISTENCIA ---
+    public void addToWatchlist(Movie movie) {
+        if (!currentUser.isInWatchlist(movie)) {
+            currentUser.addToWatchlist(movie);
+            if (dbHelper != null) {
+                dbHelper.addToWatchlist(movie.getId()); // Guardar en BD
+                localWatchlistIds.add(movie.getId());
+            }
+        }
+    }
+
+    public void removeFromWatchlist(Movie movie) {
+        if (currentUser.isInWatchlist(movie)) {
+            currentUser.removeFromWatchlist(movie);
+            if (dbHelper != null) {
+                dbHelper.removeFromWatchlist(movie.getId()); // Borrar de BD
+                localWatchlistIds.remove(movie.getId());
+            }
+        }
+    }
+
+    public void addToSeen(Movie movie) {
+        if (!currentUser.isSeen(movie)) {
+            currentUser.addToSeen(movie);
+            if (dbHelper != null) {
+                dbHelper.addToSeen(movie.getId()); // Guardar en BD
+                localSeenIds.add(movie.getId());
+            }
+        }
+    }
+
+    public void removeFromSeen(Movie movie) {
+        if (currentUser.isSeen(movie)) {
+            currentUser.removeFromSeen(movie);
+            if (dbHelper != null) {
+                dbHelper.removeFromSeen(movie.getId()); // Borrar de BD
+                localSeenIds.remove(movie.getId());
+            }
+        }
+    }
+
+    public void saveProgress(Movie movie, int minutes) {
+        currentUser.setResumePosition(movie, minutes);
+        if (dbHelper != null) {
+            dbHelper.saveProgress(movie.getId(), minutes); // Guardar en BD
+            localResumeMap.put(movie.getId(), minutes);
+        }
+    }
+
+    // Sincroniza las películas que llegan de Internet con lo que tenemos guardado
+    private void syncWithLocalData(Set<Movie> movies) {
+        if (localWatchlistIds == null) return;
+
+        for (Movie m : movies) {
+            if (localWatchlistIds.contains(m.getId())) {
+                m.setInWatchlist(true);
+                currentUser.addToWatchlist(m);
+            }
+            if (localSeenIds.contains(m.getId())) {
+                m.setWatched(true);
+                currentUser.addToSeen(m);
+            }
+            if (localResumeMap.containsKey(m.getId())) {
+                int min = localResumeMap.get(m.getId());
+                currentUser.setResumePosition(m, min);
+            }
+        }
+    }
 
     public interface DataCallback {
         void onDataLoaded();
@@ -55,9 +139,15 @@ public class DataRepository {
         currentOffset = 0;
         cachedMovies.clear();
 
+        // Reiniciamos usuario en memoria para reconstruirlo desde BD + Internet
+        currentUser = new User();
+
         tursoClient.fetchMovies(50, 0, new TursoClient.MovieCallback() {
             @Override
             public void onSuccess(Set<Movie> movies) {
+                // Aquí cruzamos los datos nuevos con la BD local
+                syncWithLocalData(movies);
+
                 synchronized (cachedMovies) {
                     cachedMovies.addAll(movies);
                 }
@@ -90,6 +180,7 @@ public class DataRepository {
                 tursoClient.fetchMoviesByGenre(genre, needed, new TursoClient.MovieCallback() {
                     @Override
                     public void onSuccess(Set<Movie> movies) {
+                        syncWithLocalData(movies); // Sincronizar
                         synchronized (cachedMovies) {
                             cachedMovies.addAll(movies);
                         }
@@ -119,54 +210,11 @@ public class DataRepository {
         if (callback != null) callback.onDataLoaded();
     }
 
-    public void loadMoreMovies(DataCallback callback) {
-        if (isLoading) return;
-        isLoading = true;
-        tursoClient.fetchMovies(PAGE_SIZE, currentOffset, new TursoClient.MovieCallback() {
-            @Override
-            public void onSuccess(Set<Movie> movies) {
-                if (!movies.isEmpty()) {
-                    for (Movie m : movies) if (!cachedMovies.contains(m)) cachedMovies.add(m);
-                    currentOffset += movies.size();
-                }
-                isLoading = false;
-                if (callback != null) callback.onDataLoaded();
-            }
-            @Override
-            public void onError(Exception e) {
-                isLoading = false;
-                if (callback != null) callback.onError(e.getMessage());
-            }
-        });
-    }
+
 
     public User getCurrentUser() { return currentUser; }
     public Set<Movie> getAllMovies() { return new LinkedHashSet<>(cachedMovies); }
-    public Set<Movie> getMovies() {
-        Set<Movie> movies = new LinkedHashSet<>();
-        for (Movie m : cachedMovies) if (!m.isSeries()) movies.add(m);
-        return movies;
-    }
-    public Set<Movie> getSeries() {
-        Set<Movie> series = new LinkedHashSet<>();
-        for (Movie m : cachedMovies) if (m.isSeries()) series.add(m);
-        return series;
-    }
-    public Set<Movie> getActionMovies() {
-        Set<Movie> action = new LinkedHashSet<>();
-        for (Movie m : cachedMovies) if (hasGenre(m, "action") || hasGenre(m, "adventure") || hasGenre(m, "aventura")) action.add(m);
-        return action;
-    }
-    public Set<Movie> getSciFiMovies() {
-        Set<Movie> scifi = new LinkedHashSet<>();
-        for (Movie m : cachedMovies) if (hasGenre(m, "sci") || hasGenre(m, "future") || hasGenre(m, "ciencia")) scifi.add(m);
-        return scifi;
-    }
-    public Set<Movie> getCrimeMovies() {
-        Set<Movie> crime = new LinkedHashSet<>();
-        for (Movie m : cachedMovies) if (hasGenre(m, "crime") || hasGenre(m, "drama") || hasGenre(m, "thriller")) crime.add(m);
-        return crime;
-    }
+
 
     public Set<Movie> search(String query) {
         String normalizedQuery = normalizeForSearch(query);
@@ -196,10 +244,8 @@ public class DataRepository {
     private Set<Movie> recommendedMovies = new LinkedHashSet<>();
     public Set<Movie> getRecommendedMovies() { return new LinkedHashSet<>(recommendedMovies); }
     private boolean recommendationsDirty = true;
-    public void addToWatchlist(Movie movie) { if (!currentUser.isInWatchlist(movie)) { currentUser.addToWatchlist(movie); recommendationsDirty = true; } }
-    public void addToSeen(Movie movie) { if (!currentUser.isSeen(movie)) { currentUser.addToSeen(movie); recommendationsDirty = true; } }
-    public void removeFromWatchlist(Movie movie) { if (currentUser.isInWatchlist(movie)) { currentUser.removeFromWatchlist(movie); recommendationsDirty = true; } }
-    public void removeFromSeen(Movie movie) { if (currentUser.isSeen(movie)) { currentUser.removeFromSeen(movie); recommendationsDirty = true; } }
+    // Métodos delegados actualizados (ya implementados arriba)
+
     public void refreshRecommendations(DataCallback callback) { recommendationsDirty = true; loadRecommendations(callback); }
     public void loadRecommendations(DataCallback callback) {
         if (!recommendationsDirty && !recommendedMovies.isEmpty()) { if (callback != null) callback.onDataLoaded(); return; }
@@ -214,11 +260,6 @@ public class DataRepository {
     }
     private void addGenresToCount(java.util.Collection<Movie> movies, java.util.Map<String, Integer> counts) {
         for (Movie m : movies) if (m.getGenres() != null) for (String g : m.getGenres()) counts.put(g, counts.getOrDefault(g, 0) + 1);
-    }
-    private boolean hasAnyGenre(Movie m, java.util.Collection<String> targetGenres) {
-        if (m.getGenres() == null) return false;
-        for (String g : m.getGenres()) if (targetGenres.contains(g.toLowerCase())) return true;
-        return false;
     }
     public List<String> getSignificantGenres() {
         java.util.Map<String, Integer> counts = new java.util.HashMap<>();

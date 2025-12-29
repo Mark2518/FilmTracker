@@ -44,11 +44,10 @@ public class TursoClient {
         void onError(Exception e);
     }
 
-    // --- SELECCIÓN INTELIGENTE DE IDIOMA ---
     private String getColumns() {
         String lang = Locale.getDefault().getLanguage();
         if (lang.equals("es")) {
-
+            //Ponemos overview_es como overview para evitar poner mas variables en la clase de movies
             return "rowid, title, runtime, overview_es as overview, poster_path, genres";
         } else {
             return "rowid, title, runtime, overview, poster_path, genres";

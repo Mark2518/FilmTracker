@@ -4,22 +4,19 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class User {
-    private String username;
     private Set<Movie> watchlist;
     private Set<Movie> seenList;
     private java.util.Map<Long, Integer> resumePositions;
     private Set<Movie> resumeMovies;
 
-    public User(String username) {
-        this.username = username;
+    public User() {
         this.watchlist = new LinkedHashSet<>();
         this.seenList = new LinkedHashSet<>();
         this.resumePositions = new java.util.HashMap<>();
         this.resumeMovies = new LinkedHashSet<>();
     }
 
-    public String getUsername() { return username; }
-    
+
     public Set<Movie> getWatchlist() { return watchlist; }
     public Set<Movie> getSeenList() { return seenList; }
     public Set<Movie> getResumeMovies() { return resumeMovies; }

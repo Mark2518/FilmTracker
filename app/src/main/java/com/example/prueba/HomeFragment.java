@@ -38,12 +38,10 @@ public class HomeFragment extends Fragment {
         return view;
     }
 
-    // --- CAMBIO IMPORTANTE: Eliminada la lógica de recarga en onResume ---
     @Override
     public void onResume() {
         super.onResume();
-        // Hemos quitado la llamada a loadRecommendations aquí.
-        // Esto evita que las películas se "barajen" aleatoriamente al volver de ver un detalle.
+
     }
     // ---------------------------------------------------------------------
 

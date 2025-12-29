@@ -48,7 +48,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
         Category category = categoryList.get(position);
         holder.title.setText(category.getTitle());
 
-        // Refresh is now handled by the horizontal adapter's footer item
         HorizontalMovieAdapter movieAdapter = new HorizontalMovieAdapter(context, category.getMovies(), category.getOnRefresh());
         holder.recyclerView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false));
         holder.recyclerView.setAdapter(movieAdapter);

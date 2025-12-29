@@ -6,22 +6,20 @@ import java.util.List;
 import java.util.Objects;
 
 public class Movie implements Serializable {
-    // Campos que SI existen en tu Base de Datos
+
     private long id;
     private String title;
 
     private String posterUrl;
-    private String description; // (overview)
+    private String description; // overview
 
-    private String duration;    // (runtime convertido)
+    private String duration;
     private List<String> genres;
 
-    // Estados de la app (no de la BD)
     private boolean isWatched = false;
     private boolean isInWatchlist = false;
     private boolean isLoading = false;
 
-    // --- NUEVO CONSTRUCTOR (Solo elementos de la BD) ---
     public Movie(long id, String title, String posterUrl, String description, String duration, List<String> genres) {
         this.id = id;
         this.title = title;
@@ -32,7 +30,6 @@ public class Movie implements Serializable {
         this.genres = genres != null ? genres : new ArrayList<>();
     }
 
-    // Constructor para la carga ("loading skeletons")
     public static Movie createLoadingMovie() {
         long randomId = -(long)(Math.random() * 1000000);
         Movie m = new Movie(randomId, "", "", "", "", new ArrayList<>());
@@ -40,7 +37,6 @@ public class Movie implements Serializable {
         return m;
     }
 
-    // --- GETTERS REALES ---
     public long getId() { return id; }
     public String getTitle() { return title; }
 
@@ -50,15 +46,11 @@ public class Movie implements Serializable {
     public String getDuration() { return duration; }
     public List<String> getGenres() { return genres; }
 
-    // --- COMPATIBILIDAD (Para que no falle DetailActivity) ---
-    // Como ya no tienes estos datos, devolvemos vacío o el poster
-    public String getBackdropUrl() { return posterUrl; }
-    public String getDirector() { return ""; }
-    public String getYear() { return ""; }
-    public boolean isSeries() { return false; }
-    public String getRating() { return ""; }
 
-    // --- ESTADOS ---
+    public String getBackdropUrl() { return posterUrl; }
+
+
+
     public boolean isLoading() { return isLoading; }
     public boolean isWatched() { return isWatched; }
     public void setWatched(boolean watched) { isWatched = watched; }

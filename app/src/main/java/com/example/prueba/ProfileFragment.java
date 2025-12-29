@@ -18,27 +18,24 @@ public class ProfileFragment extends Fragment {
     private RecyclerView seenRecyclerView;
     private RecyclerView continueWatchingRecyclerView;
     private android.widget.TextView labelContinueWatching;
-    private ImageButton btnSettings; // Nuevo botón
+    private ImageButton btnSettings;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_profile, container, false);
 
-        // 1. Enlazamos las vistas
         watchlistRecyclerView = view.findViewById(R.id.watchlist_recycler_view);
         seenRecyclerView = view.findViewById(R.id.seen_recycler_view);
         continueWatchingRecyclerView = view.findViewById(R.id.continue_watching_recycler_view);
         labelContinueWatching = view.findViewById(R.id.label_continue_watching);
         btnSettings = view.findViewById(R.id.btn_settings_profile); // Enlazamos el botón
 
-        // 2. Acción del botón de ajustes
         btnSettings.setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), SettingsActivity.class);
             startActivity(intent);
         });
 
-        // 3. Configuramos los LayoutManager
         watchlistRecyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         seenRecyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         continueWatchingRecyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
