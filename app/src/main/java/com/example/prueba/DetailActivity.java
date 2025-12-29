@@ -29,7 +29,6 @@ public class DetailActivity extends AppCompatActivity {
             android.widget.Button btnSeen = findViewById(R.id.btn_seen);
             android.widget.Button btnSaveProgress = findViewById(R.id.btn_save_progress);
 
-            // Asignamos los textos
             title.setText(movie.getTitle());
 
             StringBuilder yearDirectorText = new StringBuilder();
@@ -51,7 +50,6 @@ public class DetailActivity extends AppCompatActivity {
 
             updateButtons(btnWatchlist, btnSeen, movie);
 
-            // Listeners de botones
             btnWatchlist.setOnClickListener(v -> {
                 DataRepository repo = DataRepository.getInstance();
                 User user = repo.getCurrentUser();
@@ -85,7 +83,6 @@ public class DetailActivity extends AppCompatActivity {
                 editResume.setText(String.valueOf(savedMinute));
             }
 
-            // --- LÓGICA DE GUARDADO CON DIALOG ---
             btnSaveProgress.setOnClickListener(v -> {
                 String input = editResume.getText().toString();
                 if (!input.isEmpty()) {
@@ -105,9 +102,7 @@ public class DetailActivity extends AppCompatActivity {
                             // Ignorar error de parseo si el formato es raro
                         }
 
-                        // VALIDACIÓN
                         if (totalDuration > 0 && minutes > totalDuration) {
-                            // --- AQUÍ ESTÁ EL CAMBIO: USAR DIALOG ---
                             String errorMsg = getString(R.string.msg_time_invalid, totalDuration);
 
                             new AlertDialog.Builder(this)
@@ -116,7 +111,6 @@ public class DetailActivity extends AppCompatActivity {
                                     .setIcon(android.R.drawable.ic_dialog_alert)
                                     .setPositiveButton(R.string.btn_ok, null) // Botón Aceptar
                                     .show();
-                            // ----------------------------------------
 
                         } else if (minutes < 0) {
                             android.widget.Toast.makeText(this, R.string.msg_invalid_number, android.widget.Toast.LENGTH_SHORT).show();
