@@ -27,7 +27,6 @@ public class DetailActivity extends AppCompatActivity {
             android.widget.Button btnWatchlist = findViewById(R.id.btn_watchlist);
             android.widget.Button btnSeen = findViewById(R.id.btn_seen);
             android.widget.Button btnSaveProgress = findViewById(R.id.btn_save_progress);
-            android.widget.Button btnLanguage = findViewById(R.id.btn_language);
 
             title.setText(movie.getTitle());
             StringBuilder yearDirectorText = new StringBuilder();
@@ -54,16 +53,8 @@ public class DetailActivity extends AppCompatActivity {
             
             // Set initial text for language button
             String currentLang = getResources().getConfiguration().getLocales().get(0).getLanguage();
-            btnLanguage.setText(currentLang.equalsIgnoreCase("es") ? "ES" : "EN");
 
-            btnLanguage.setOnClickListener(v -> {
-                String lang = getResources().getConfiguration().getLocales().get(0).getLanguage();
-                if (lang.equalsIgnoreCase("es")) {
-                    setLocale("en");
-                } else {
-                    setLocale("es");
-                }
-            });
+
 
             updateButtons(btnWatchlist, btnSeen, movie);
 

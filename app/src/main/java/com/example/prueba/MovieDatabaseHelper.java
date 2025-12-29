@@ -15,6 +15,7 @@ public class MovieDatabaseHelper extends SQLiteOpenHelper {
     public static final String TABLE_MOVIES = "movies";
     public static final String COLUMN_ID = "id";
     public static final String COLUMN_TITLE = "title";
+    public static final String COLUMN_TITLE_ES = "title_es";
     public static final String COLUMN_RUNTIME = "runtime";
     public static final String COLUMN_OVERVIEW = "overview";
     public static final String COLUMN_POSTER_PATH = "poster_path";
@@ -52,6 +53,7 @@ public class MovieDatabaseHelper extends SQLiteOpenHelper {
             do {
                 long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID));
                 String title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE));
+                String title_es = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE_ES));
                 int runtime = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_RUNTIME));
                 String overview = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_OVERVIEW));
                 String posterUrl = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_POSTER_PATH));

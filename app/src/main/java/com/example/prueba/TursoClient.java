@@ -12,6 +12,7 @@ import java.util.Set;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale; // IMPORTANTE
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import okhttp3.MediaType;
@@ -43,20 +44,39 @@ public class TursoClient {
         void onError(Exception e);
     }
 
-    // --- MÉTODOS DE BÚSQUEDA ---
+    // --- NUEVO: SELECCIÓN DINÁMICA DE COLUMNAS ---
+    private String getColumns() {
+        String lang = Locale.getDefault().getLanguage();
+
+        // Basado en tu imagen de la base de datos:
+        // Tienes 'overview' (inglés) y 'overview_es' (español).
+        // NO TIENES 'title_es' en la imagen, así que el título se queda igual.
+
+        if (lang.equals("es")) {
+            // Truco SQL: COALESCE usa el español, y si está vacío, usa el inglés.
+            // "AS overview" engaña a Java para que crea que es la columna normal.
+            return "rowid, title, runtime, COALESCE(overview_es, overview) as overview, poster_path, genres";
+        } else {
+            return "rowid, title, runtime, overview, poster_path, genres";
+        }
+    }
+
+    // --- MÉTODOS DE BÚSQUEDA ACTUALIZADOS ---
+
     public void fetchMovies(int limit, int offset, MovieCallback callback) {
-        String sql = "SELECT rowid, * FROM peliculas LIMIT " + limit + " OFFSET " + offset;
+        // Usamos getColumns() en lugar de *
+        String sql = "SELECT " + getColumns() + " FROM peliculas LIMIT " + limit + " OFFSET " + offset;
         executeSql(sql, callback);
     }
 
     public void fetchRandomMovies(MovieCallback callback) {
-        String sql = "SELECT rowid, * FROM peliculas ORDER BY RANDOM() LIMIT 20";
+        String sql = "SELECT " + getColumns() + " FROM peliculas ORDER BY RANDOM() LIMIT 20";
         executeSql(sql, callback);
     }
 
     public void fetchMoviesByGenre(String genre, int limit, MovieCallback callback) {
         String safeGenre = genre.replace("'", "''");
-        String sql = "SELECT rowid, * FROM peliculas WHERE genres LIKE '%" + safeGenre + "%' ORDER BY RANDOM() LIMIT " + limit;
+        String sql = "SELECT " + getColumns() + " FROM peliculas WHERE genres LIKE '%" + safeGenre + "%' ORDER BY RANDOM() LIMIT " + limit;
         executeSql(sql, callback);
     }
 
@@ -69,7 +89,9 @@ public class TursoClient {
 
         String[] terms = safeQuery.split("\\s+");
         StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append("SELECT rowid, * FROM peliculas WHERE ");
+
+        // Inyectamos las columnas correctas aquí también
+        sqlBuilder.append("SELECT ").append(getColumns()).append(" FROM peliculas WHERE ");
 
         for (int i = 0; i < terms.length; i++) {
             if (i > 0) sqlBuilder.append(" AND ");
@@ -81,7 +103,6 @@ public class TursoClient {
         executeSql(sqlBuilder.toString(), callback);
     }
 
-    // (Opcional) fetchRecommendations simplificado
     public void fetchRecommendations(List<String> genres, List<String> titleKeywords, MovieCallback callback) {
         if (genres == null || genres.isEmpty()) {
             fetchRandomMovies(callback);
@@ -89,7 +110,7 @@ public class TursoClient {
         }
         List<String> topGenres = (genres.size() > 3) ? genres.subList(0, 3) : genres;
 
-        StringBuilder sb = new StringBuilder("SELECT rowid, * FROM peliculas WHERE ");
+        StringBuilder sb = new StringBuilder("SELECT " + getColumns() + " FROM peliculas WHERE ");
         sb.append("(");
         for (int i = 0; i < topGenres.size(); i++) {
             String g = topGenres.get(i).replace("'", "''").trim();
@@ -100,7 +121,7 @@ public class TursoClient {
         executeSql(sb.toString(), callback);
     }
 
-    // --- PARSEO Y EJECUCIÓN ---
+    // --- PARSEO (Sin cambios, pero ahora recibirá los datos correctos) ---
     private void executeSql(String sql, MovieCallback callback) {
         executor.execute(() -> {
             try {
@@ -167,7 +188,6 @@ public class TursoClient {
                         String overview = getString(row, colOverview);
                         String rawPoster = getString(row, colPoster);
 
-                        // Parseo de géneros
                         String genreStr = getString(row, colGenre);
                         List<String> genreList = new ArrayList<>();
                         if (!genreStr.isEmpty()) {
@@ -175,14 +195,10 @@ public class TursoClient {
                             for (String g : cleanGenres.split(",")) genreList.add(g.trim());
                         }
 
-
-
-
                         int hours = runtime / 60;
                         int minutes = runtime % 60;
                         String durationStr = (hours > 0 ? hours + "h " : "") + minutes + "m";
 
-                        // AQUÍ: Usamos el nuevo constructor limpio
                         movies.add(new Movie(id, title, rawPoster, overview, durationStr, genreList));
 
                     } catch (Exception e) {

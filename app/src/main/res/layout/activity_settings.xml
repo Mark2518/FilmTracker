@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#141a32"> <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Ajustes / Settings"
+    android:textColor="#FFFFFF"
+    android:textSize="28sp"
+    android:textStyle="bold"
+    android:layout_marginBottom="32dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Idioma / Language"
+        android:textColor="#AAAAAA"
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp"/>
+
+    <RadioGroup
+        android:id="@+id/radioGroupLanguage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <RadioButton
+            android:id="@+id/radioEs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Español"
+            android:textColor="#FFFFFF"
+            android:buttonTint="#00E054"
+            android:padding="12dp"
+            android:textSize="18sp"/>
+
+        <RadioButton
+            android:id="@+id/radioEn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="English"
+            android:textColor="#FFFFFF"
+            android:buttonTint="#00E054"
+            android:padding="12dp"
+            android:textSize="18sp"/>
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/btnApplySettings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Aplicar / Apply"
+        android:backgroundTint="#00E054"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginTop="32dp"/>
+
+</LinearLayout>

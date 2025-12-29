@@ -9,8 +9,10 @@ public class Movie implements Serializable {
     // Campos que SI existen en tu Base de Datos
     private long id;
     private String title;
+
     private String posterUrl;
     private String description; // (overview)
+
     private String duration;    // (runtime convertido)
     private List<String> genres;
 
@@ -23,6 +25,7 @@ public class Movie implements Serializable {
     public Movie(long id, String title, String posterUrl, String description, String duration, List<String> genres) {
         this.id = id;
         this.title = title;
+
         this.posterUrl = posterUrl;
         this.description = description;
         this.duration = duration;
@@ -40,6 +43,8 @@ public class Movie implements Serializable {
     // --- GETTERS REALES ---
     public long getId() { return id; }
     public String getTitle() { return title; }
+
+
     public String getPosterUrl() { return posterUrl; }
     public String getDescription() { return description; }
     public String getDuration() { return duration; }

@@ -1,9 +1,11 @@
 package com.example.prueba;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -16,17 +18,27 @@ public class ProfileFragment extends Fragment {
     private RecyclerView seenRecyclerView;
     private RecyclerView continueWatchingRecyclerView;
     private android.widget.TextView labelContinueWatching;
+    private ImageButton btnSettings; // Nuevo botón
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_profile, container, false);
-        
+
+        // 1. Enlazamos las vistas
         watchlistRecyclerView = view.findViewById(R.id.watchlist_recycler_view);
         seenRecyclerView = view.findViewById(R.id.seen_recycler_view);
         continueWatchingRecyclerView = view.findViewById(R.id.continue_watching_recycler_view);
         labelContinueWatching = view.findViewById(R.id.label_continue_watching);
+        btnSettings = view.findViewById(R.id.btn_settings_profile); // Enlazamos el botón
 
+        // 2. Acción del botón de ajustes
+        btnSettings.setOnClickListener(v -> {
+            Intent intent = new Intent(getActivity(), SettingsActivity.class);
+            startActivity(intent);
+        });
+
+        // 3. Configuramos los LayoutManager
         watchlistRecyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         seenRecyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         continueWatchingRecyclerView.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
@@ -43,7 +55,7 @@ public class ProfileFragment extends Fragment {
     private void loadData() {
         DataRepository repo = DataRepository.getInstance();
         User user = repo.getCurrentUser();
-        
+
         // Continue Watching
         java.util.Set<Movie> continueWatchingList = repo.getContinueWatchingMovies();
         if (!continueWatchingList.isEmpty()) {
@@ -55,7 +67,8 @@ public class ProfileFragment extends Fragment {
             labelContinueWatching.setVisibility(View.GONE);
             continueWatchingRecyclerView.setVisibility(View.GONE);
         }
-        
+
+        // Watchlist & Seen
         HorizontalMovieAdapter watchlistAdapter = new HorizontalMovieAdapter(getContext(), user.getWatchlist());
         watchlistRecyclerView.setAdapter(watchlistAdapter);
 
