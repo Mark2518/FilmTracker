@@ -15,7 +15,7 @@ import java.util.HashMap;
 public class MovieDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "movies.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     public static final String TABLE_MOVIES = "movies";
     public static final String COLUMN_ID = "id";
@@ -40,12 +40,44 @@ public class MovieDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-            //No hace falta
+        // Crear tabla MOVIES
+        String createMoviesTable = "CREATE TABLE " + TABLE_MOVIES + " (" +
+                COLUMN_ID + " INTEGER PRIMARY KEY, " +
+                COLUMN_TITLE + " TEXT, " +
+                COLUMN_RUNTIME + " TEXT, " +
+                COLUMN_OVERVIEW + " TEXT, " +
+                COLUMN_POSTER_PATH + " TEXT, " +
+                COLUMN_GENRES + " TEXT)";
+        db.execSQL(createMoviesTable);
+
+        // Crear tabla WATCHLIST
+        String createWatchlistTable = "CREATE TABLE " + TABLE_WATCHLIST + " (" +
+                COL_MOVIE_ID + " INTEGER PRIMARY KEY, " +
+                COL_TIMESTAMP + " INTEGER)";
+        db.execSQL(createWatchlistTable);
+
+        // Crear tabla SEEN
+        String createSeenTable = "CREATE TABLE " + TABLE_SEEN + " (" +
+                COL_MOVIE_ID + " INTEGER PRIMARY KEY, " +
+                COL_TIMESTAMP + " INTEGER)";
+        db.execSQL(createSeenTable);
+
+        //Crear tabla RESUME
+        String createResumeTable = "CREATE TABLE " + TABLE_RESUME + " (" +
+                COL_MOVIE_ID + " INTEGER PRIMARY KEY, " +
+                COL_POSITION + " INTEGER)";
+        db.execSQL(createResumeTable);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        //No hace falta
+        // Borrar tablas antiguas si cambia la versión
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_MOVIES);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WATCHLIST);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_SEEN);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_RESUME);
+        // Volver a crear
+        onCreate(db);
     }
 
     public void addToWatchlist(long movieId) {
